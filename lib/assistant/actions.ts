@@ -22,7 +22,10 @@ export async function runAssistantCommand(supabase: Client, input: string): Prom
     return addPackItemQuantity(supabase, intent.jobHint, intent.itemHint, intent.quantity);
   }
 
-  return upsertOperation(supabase, intent.owner, intent.title, intent.dueAt, intent.raw);
+  if (intent.type === "upsert_operation") {
+    return upsertOperation(supabase, intent.owner, intent.title, intent.dueAt, intent.raw);
+  }
+  return { ok: false, message: "Use the current server assistant for this command." };
 }
 
 async function addPackItemQuantity(supabase: Client, jobHint: string, itemHint: string, quantity: number): Promise<AssistantResult> {

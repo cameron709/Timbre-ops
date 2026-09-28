@@ -1,15 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { SendHorizonal } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { runAssistantCommand } from "@/lib/assistant/actions";
 
 export function AssistantBox({ onDone }: { onDone?: () => void }) {
   const supabase = useMemo(() => createBrowserClient(), []);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [responseResults, setResponseResults] = useState<{ id: string; title: string }[]>([]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -17,9 +18,17 @@ export function AssistantBox({ onDone }: { onDone?: () => void }) {
 
     setBusy(true);
     setResult(null);
-    const response = await runAssistantCommand(supabase, text);
+    setResponseResults([]);
+    const { data } = await supabase.auth.getSession();
+    const request = await fetch("/api/assistant", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${data.session?.access_token ?? ""}` },
+      body: JSON.stringify({ text })
+    });
+    const response = await request.json() as { ok: boolean; message: string; results?: { jobs?: { id: string; title: string }[] } };
     setBusy(false);
     setResult(response.message);
+    setResponseResults(response.results?.jobs ?? []);
     if (response.ok) {
       setText("");
       onDone?.();
@@ -42,6 +51,7 @@ export function AssistantBox({ onDone }: { onDone?: () => void }) {
         </button>
       </div>
       {result ? <p className="assistant-result">{result}</p> : null}
+      {responseResults?.map((item) => <Link className="assistant-link" href={`/jobs/${item.id}`} key={item.id}>{item.title}</Link>)}
     </form>
   );
 }

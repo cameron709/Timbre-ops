@@ -6,6 +6,9 @@ export type AssistantIntent =
       itemHint: string;
       quantity: number;
     }
+  | { type: "remember"; raw: string; jobHint: string | null; summary: string }
+  | { type: "inform_arrival"; raw: string; jobHint: string; timeText: string }
+  | { type: "find"; raw: string; query: string }
   | {
       type: "upsert_operation";
       raw: string;
@@ -41,6 +44,15 @@ export function parseAssistantCommand(input: string, now = new Date()): Assistan
   const raw = input.trim();
   const normalized = raw.replace(/\s+/g, " ");
 
+  const rememberMatch = normalized.match(/^(?:remember|next time[:,]?)\s+(?<summary>.+?)(?:\s+for\s+(?<job>.+))?$/i);
+  if (rememberMatch?.groups) return { type: "remember", raw, summary: rememberMatch.groups.summary.trim(), jobHint: rememberMatch.groups.job?.trim() ?? null };
+
+  const informMatch = normalized.match(/^(?:.+?\s+said\s+)?(?:we\s+can\s+)?(?:get\s+)?(?:onto|on)\s+site\s+at\s+(?<time>\d{1,2}(?::\d{2})?\s*(?:am|pm)?)(?:\s+for\s+(?<job>.+))$/i);
+  if (informMatch?.groups) return { type: "inform_arrival", raw, timeText: informMatch.groups.time, jobHint: informMatch.groups.job.trim() };
+
+  const findMatch = normalized.match(/^(?:find|show me|search for)\s+(?<query>.+)$/i);
+  if (findMatch?.groups) return { type: "find", raw, query: findMatch.groups.query.trim() };
+
   const packMatch = normalized.match(/^add\s+(?<quantity>\d+|a|an|another|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?<item>.+?)\s+to\s+(?<job>.+)$/i);
   if (packMatch?.groups) {
     const quantityToken = packMatch.groups.quantity.toLowerCase();
@@ -68,7 +80,7 @@ export function parseAssistantCommand(input: string, now = new Date()): Assistan
   return {
     type: "unknown",
     raw,
-    reason: "I can add gear to a job pack list or create an operation for Cameron/Beth in this milestone."
+      reason: "I can update a pack list, create an operation, remember a lesson, record site arrival, or find jobs and memories."
   };
 }
 

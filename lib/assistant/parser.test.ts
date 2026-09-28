@@ -23,4 +23,30 @@ describe("parseAssistantCommand", () => {
       expect(intent.dueAt).toBe("2026-09-30T01:00:00.000Z");
     }
   });
+
+  it("parses a reusable job memory", () => {
+    expect(parseAssistantCommand("Remember use longer XLR runs for Mad Hatters")).toEqual({
+      type: "remember",
+      raw: "Remember use longer XLR runs for Mad Hatters",
+      summary: "use longer XLR runs",
+      jobHint: "Mad Hatters"
+    });
+  });
+
+  it("parses site access information when a job is explicit", () => {
+    expect(parseAssistantCommand("Jamie said we can get onto site at 8:30am for Mad Hatters")).toEqual({
+      type: "inform_arrival",
+      raw: "Jamie said we can get onto site at 8:30am for Mad Hatters",
+      timeText: "8:30am",
+      jobHint: "Mad Hatters"
+    });
+  });
+
+  it("parses a find request without granting arbitrary actions", () => {
+    expect(parseAssistantCommand("Find presentation laptop lessons")).toEqual({
+      type: "find",
+      raw: "Find presentation laptop lessons",
+      query: "presentation laptop lessons"
+    });
+  });
 });

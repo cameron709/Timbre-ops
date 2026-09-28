@@ -2,131 +2,51 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Activity, CalendarClock, CheckCircle2, ClipboardCheck } from "lucide-react";
+import { Activity, ArrowRight, Check, CheckCircle2, ClipboardCheck } from "lucide-react";
 import { AssistantBox } from "@/components/assistant-box";
 import { EmptyState, Pill, Section } from "@/components/ui";
 import { formatDate, formatDateTime, greeting, statusLabel } from "@/lib/format";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { ActivityLog, Job, JobChange, Operation } from "@/types/database";
 
+type ChangeWithJob = JobChange & { jobs: { title: string } | null };
+
 export default function HomePage() {
   const supabase = useMemo(() => createBrowserClient(), []);
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [operations, setOperations] = useState<Operation[]>([]);
-  const [changes, setChanges] = useState<JobChange[]>([]);
-  const [activity, setActivity] = useState<ActivityLog[]>([]);
-  const [loading, setLoading] = useState(true);
-
+  const [jobs, setJobs] = useState<Job[]>([]), [operations, setOperations] = useState<Operation[]>([]);
+  const [changes, setChanges] = useState<ChangeWithJob[]>([]), [activity, setActivity] = useState<ActivityLog[]>([]);
+  const [reviewing, setReviewing] = useState(0), [loading, setLoading] = useState(true);
   const load = useCallback(async () => {
     setLoading(true);
-    const now = new Date().toISOString();
-    const [jobsResult, opsResult, changesResult, activityResult] = await Promise.all([
-      supabase.from("jobs").select("*").gte("start_at", now).order("start_at", { ascending: true }).limit(6),
-      supabase.from("operations").select("*").neq("status", "done").order("due_at", { ascending: true, nullsFirst: false }).limit(8),
-      supabase.from("job_changes").select("*").order("created_at", { ascending: false }).limit(6),
-      supabase.from("activity_log").select("*").order("created_at", { ascending: false }).limit(8)
+    const [a,b,c,d] = await Promise.all([
+      supabase.from("jobs").select("*").not("status", "in", "(closed,cancelled)").order("start_at", { ascending: true, nullsFirst: false }).limit(8),
+      supabase.from("operations").select("*").in("status", ["open", "waiting"]).order("due_at", { ascending: true, nullsFirst: false }).limit(8),
+      supabase.from("job_changes").select("*,jobs(title)").order("created_at", { ascending: false }).limit(12),
+      supabase.from("activity_log").select("*").order("created_at", { ascending: false }).limit(10)
     ]);
-
-    setJobs(jobsResult.data ?? []);
-    setOperations(opsResult.data ?? []);
-    setChanges(changesResult.data ?? []);
-    setActivity(activityResult.data ?? []);
-    setLoading(false);
+    setJobs(a.data ?? []); setOperations(b.data ?? []); setChanges((c.data ?? []) as unknown as ChangeWithJob[]); setActivity(d.data ?? []); setLoading(false);
   }, [supabase]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const needsYou = [
-    ...operations.filter((operation) => operation.status === "open").slice(0, 3),
-    ...changes.filter((change) => change.requires_attention).slice(0, 3)
-  ].slice(0, 4);
-
-  return (
-    <main className="page">
-      <section className="briefing-hero">
-        <div>
-          <p className="eyebrow">{formatDate(new Date().toISOString(), { weekday: "long", year: "numeric" })}</p>
-          <h1>{greeting()}, Cameron</h1>
-        </div>
-        <AssistantBox onDone={load} />
-      </section>
-
-      <div className="dashboard-grid">
-        <Section title="Needs You">
-          <div className="list">
-            {loading ? <EmptyState icon={ClipboardCheck} title="Checking the briefing" body="Loading live operations data." /> : null}
-            {!loading && needsYou.length === 0 ? (
-              <EmptyState icon={CheckCircle2} title="Nothing urgent" body="No open attention items are currently surfaced." />
-            ) : null}
-            {needsYou.map((item) => (
-              <article className="card" key={item.id}>
-                {"title" in item ? <h3>{item.title}</h3> : <h3>{item.summary}</h3>}
-                <div className="card-row">
-                  {"owner" in item ? <span className="meta">{item.owner ?? "Team"} {item.due_at ? `· ${formatDateTime(item.due_at)}` : ""}</span> : <span className="meta">Job change</span>}
-                  {"status" in item ? <Pill tone="warn">{statusLabel(item.status)}</Pill> : <Pill tone="warn">Attention</Pill>}
-                </div>
-              </article>
-            ))}
-          </div>
-        </Section>
-
-        <Section title="Operations" action={<Link className="meta" href="/ops">Open Ops</Link>}>
-          <div className="list">
-            {operations.slice(0, 4).map((operation) => (
-              <article className="card" key={operation.id}>
-                <div className="card-row">
-                  <h3>{operation.title}</h3>
-                  <Pill>{operation.owner ?? "Team"}</Pill>
-                </div>
-                <p className="meta">{operation.due_at ? formatDateTime(operation.due_at) : "No due date"}</p>
-              </article>
-            ))}
-          </div>
-        </Section>
-
-        <Section title="Coming Up" action={<Link className="meta" href="/calendar">Timeline</Link>}>
-          <div className="list">
-            {jobs.slice(0, 4).map((job) => (
-              <Link className="card" href={`/jobs/${job.id}`} key={job.id}>
-                <div className="card-row">
-                  <h3>{job.title}</h3>
-                  <Pill tone="good">{job.readiness}%</Pill>
-                </div>
-                <p className="meta">{formatDateTime(job.start_at)} {job.venue ? `· ${job.venue}` : ""}</p>
-              </Link>
-            ))}
-          </div>
-        </Section>
-
-        <Section title="What Changed">
-          <div className="list">
-            {changes.slice(0, 4).map((change) => (
-              <article className="card" key={change.id}>
-                <h3>{change.summary}</h3>
-                <p className="meta">{formatDateTime(change.created_at)} · {statusLabel(change.source)}</p>
-              </article>
-            ))}
-          </div>
-        </Section>
-      </div>
-
-      <details className="activity-drawer">
-        <summary>Timbre Handled</summary>
-        <div className="list">
-          {activity.map((item) => (
-            <article className="card" key={item.id}>
-              <div className="card-row">
-                <h3>{item.summary}</h3>
-                <Activity size={17} />
-              </div>
-              <p className="meta">{formatDateTime(item.created_at)} · {item.action}</p>
-            </article>
-          ))}
-          {!activity.length ? <EmptyState icon={CalendarClock} title="No recent activity" body="Handled work will appear here as the system records it." /> : null}
-        </div>
-      </details>
-    </main>
-  );
+  useEffect(() => { load(); }, [load]);
+  const needsYou = changes.filter((change) => change.requires_attention && !change.resolved_at), current = needsYou[reviewing];
+  async function resolve(change: ChangeWithJob) {
+    const { data } = await supabase.auth.getUser();
+    await supabase.from("job_changes").update({ resolved_at: new Date().toISOString(), resolved_by: data.user?.id ?? null, resolution: "Reviewed in Needs You" }).eq("id", change.id);
+    await supabase.from("activity_log").insert({ job_id: change.job_id, action: "attention.resolved", summary: `Reviewed: ${change.summary}`, source: "cameron", metadata: {} });
+    setReviewing(0); load();
+  }
+  return <main className="page briefing-page">
+    <section className="briefing-hero"><div><p className="eyebrow">{formatDate(new Date().toISOString(), { weekday: "long", year: "numeric" })}</p><h1>{greeting()}, Cameron</h1><p className="lede">Here is what needs attention across Timbre.</p></div><AssistantBox onDone={load} /></section>
+    <Section title="Needs You" action={needsYou.length ? <button className="text-action" onClick={() => setReviewing(0)} type="button">Take me through them <ArrowRight size={15}/></button> : undefined}>
+      {loading ? <EmptyState icon={ClipboardCheck} title="Checking the briefing" body="Loading live operational context." /> : null}
+      {!loading && !needsYou.length ? <div className="clear-state"><CheckCircle2 size={20}/><div><strong>Nothing needs a decision</strong><span>Changes and tasks are still visible below.</span></div></div> : null}
+      <div className="attention-list">{needsYou.slice(0,3).map((change)=><Link className="attention-row" href={`/jobs/${change.job_id}?tab=changes`} key={change.id}><span className="attention-dot"/><span><strong>{change.summary}</strong><small>{change.jobs?.title ?? "Job"} · {statusLabel(change.source)}</small></span><ArrowRight size={17}/></Link>)}</div>
+    </Section>
+    {current ? <section className="review-panel"><p className="eyebrow">Attention {reviewing+1} of {needsYou.length}</p><h2>{current.summary}</h2><p>{current.detail}</p><p className="meta">{current.jobs?.title} · via {statusLabel(current.source)}</p><div className="review-actions"><Link className="secondary-button" href={`/jobs/${current.job_id}?tab=changes`}>Open job</Link><button onClick={()=>resolve(current)} type="button"><Check size={16}/> Mark reviewed</button>{reviewing < needsYou.length-1 ? <button className="secondary-button" onClick={()=>setReviewing(reviewing+1)} type="button">Next</button>:null}</div></section>:null}
+    <div className="briefing-columns">
+      <Section title="Operations" action={<Link className="section-link" href="/ops">All Ops <ArrowRight size={14}/></Link>}><div className="compact-list">{operations.slice(0,4).map((item)=><Link href="/ops" className="compact-row" key={item.id}><span><strong>{item.title}</strong><small>{item.owner ?? "Team"} · {item.due_at ? formatDateTime(item.due_at) : "No due date"}</small></span><Pill tone={item.status === "waiting" ? "warn":"neutral"}>{statusLabel(item.status)}</Pill></Link>)}</div></Section>
+      <Section title="Coming Up" action={<Link className="section-link" href="/calendar">Timeline <ArrowRight size={14}/></Link>}><div className="compact-list">{jobs.slice(0,5).map((job)=><Link href={`/jobs/${job.id}`} className="compact-row" key={job.id}><span><strong>{job.title}</strong><small>{formatDateTime(job.start_at)}{job.venue ? ` · ${job.venue}`:""}</small></span><span className="readiness-number">{job.readiness}%</span></Link>)}</div></Section>
+    </div>
+    <Section title="What Changed"><div className="change-stream">{changes.slice(0,6).map((change)=><Link href={`/jobs/${change.job_id}?tab=changes`} key={change.id}><span className="source-mark">{change.source[0].toUpperCase()}</span><span><strong>{change.summary}</strong><small>{change.jobs?.title ?? "Job"} · {formatDateTime(change.created_at)}</small></span></Link>)}</div></Section>
+    <details className="activity-drawer"><summary><span><Activity size={17}/> Timbre Handled</span><small>{activity.length} recent actions</small></summary><div className="compact-list">{activity.map((item)=><div className="compact-row" key={item.id}><span><strong>{item.summary}</strong><small>{formatDateTime(item.created_at)} · {item.action}</small></span></div>)}</div></details>
+  </main>;
 }

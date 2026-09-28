@@ -1,174 +1,20 @@
 "use client";
-
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Plus } from "lucide-react";
-import { EmptyState, Pill } from "@/components/ui";
-import { formatDateTime, statusLabel } from "@/lib/format";
-import { operationStatuses } from "@/lib/status";
+import { useCallback,useEffect,useMemo,useState } from "react";
+import Link from "next/link";
+import { Check,Plus } from "lucide-react";
+import { Pill } from "@/components/ui";
+import { formatDateTime,statusLabel } from "@/lib/format";
 import { createBrowserClient } from "@/lib/supabase/client";
-import type { Operation } from "@/types/database";
-
-type OperationDraft = {
-  title: string;
-  owner: "Cameron" | "Beth";
-  due_at: string;
-  status: Operation["status"];
-  notes: string;
-};
-
-const blankOperation: OperationDraft = {
-  title: "",
-  owner: "Cameron" as const,
-  due_at: "",
-  status: "open" as const,
-  notes: ""
-};
-
-export default function OpsPage() {
-  const supabase = useMemo(() => createBrowserClient(), []);
-  const [operations, setOperations] = useState<Operation[]>([]);
-  const [draft, setDraft] = useState(blankOperation);
-  const [editing, setEditing] = useState<Operation | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    const { data } = await supabase.from("operations").select("*").order("status").order("due_at", { ascending: true, nullsFirst: false });
-    setOperations(data ?? []);
-  }, [supabase]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setNotice(null);
-    const payload = {
-      title: draft.title,
-      owner: draft.owner,
-      due_at: draft.due_at ? new Date(draft.due_at).toISOString() : null,
-      status: draft.status,
-      notes: draft.notes || null,
-      source: draft.owner.toLowerCase() === "beth" ? "beth" as const : "cameron" as const,
-      updated_at: new Date().toISOString()
-    };
-
-    const result = editing
-      ? await supabase.from("operations").update(payload).eq("id", editing.id).select().single()
-      : await supabase.from("operations").insert(payload).select().single();
-
-    if (result.error) {
-      setNotice(result.error.message);
-      return;
-    }
-
-    await supabase.from("activity_log").insert({
-      operation_id: result.data.id,
-      action: editing ? "operation.updated" : "operation.created",
-      summary: `${result.data.title} assigned to ${result.data.owner ?? "the team"}`,
-      source: result.data.source,
-      metadata: { due_at: result.data.due_at }
-    });
-
-    setDraft(blankOperation);
-    setEditing(null);
-    setNotice("Operation saved.");
-    load();
-  }
-
-  function beginEdit(operation: Operation) {
-    setEditing(operation);
-    setDraft({
-      title: operation.title,
-      owner: operation.owner ?? "Cameron",
-      due_at: toLocalInput(operation.due_at),
-      status: operation.status,
-      notes: operation.notes ?? ""
-    });
-  }
-
-  async function complete(operation: Operation) {
-    const { error } = await supabase
-      .from("operations")
-      .update({ status: "done", updated_at: new Date().toISOString() })
-      .eq("id", operation.id);
-    setNotice(error ? error.message : "Operation completed.");
-    load();
-  }
-
-  return (
-    <main className="page">
-      <header className="page-head">
-        <div>
-          <h1>Ops</h1>
-          <p>General business work that is not always tied to a job.</p>
-        </div>
-      </header>
-
-      <section className="detail-panel">
-        <form className="form-grid" onSubmit={submit}>
-          <div className="section-head">
-            <h2>{editing ? "Edit Operation" : "New Operation"}</h2>
-            <Plus size={18} />
-          </div>
-          <label>
-            Title
-            <input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} required />
-          </label>
-          <div className="form-grid two">
-            <label>
-              Owner
-              <select value={draft.owner} onChange={(event) => setDraft({ ...draft, owner: event.target.value as "Cameron" | "Beth" })}>
-                <option value="Cameron">Cameron</option>
-                <option value="Beth">Beth</option>
-              </select>
-            </label>
-            <label>
-              Status
-              <select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as Operation["status"] })}>
-                {operationStatuses.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}
-              </select>
-            </label>
-          </div>
-          <label>
-            Due
-            <input type="datetime-local" value={draft.due_at} onChange={(event) => setDraft({ ...draft, due_at: event.target.value })} />
-          </label>
-          <label>
-            Notes
-            <textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} />
-          </label>
-          <button type="submit">{editing ? "Save changes" : "Create operation"}</button>
-          {editing ? <button className="text-button" type="button" onClick={() => { setEditing(null); setDraft(blankOperation); }}>Cancel edit</button> : null}
-          {notice ? <p className="form-message">{notice}</p> : null}
-        </form>
-      </section>
-
-      <section className="list">
-        {!operations.length ? <EmptyState icon={CheckCircle2} title="No operations visible" body="Create the first item or check RLS access." /> : null}
-        {operations.map((operation) => (
-          <article className="card" key={operation.id}>
-            <div className="card-row">
-              <h2>{operation.title}</h2>
-              <Pill tone={operation.status === "done" ? "good" : operation.status === "waiting" ? "warn" : "neutral"}>{statusLabel(operation.status)}</Pill>
-            </div>
-            <p className="meta">{operation.owner ?? "Team"} {operation.due_at ? `· ${formatDateTime(operation.due_at)}` : "· No due date"}</p>
-            {operation.notes ? <p>{operation.notes}</p> : null}
-            <div className="filter-row">
-              <button type="button" onClick={() => beginEdit(operation)}>Edit</button>
-              {operation.status !== "done" ? <button type="button" onClick={() => complete(operation)}>Complete</button> : null}
-            </div>
-          </article>
-        ))}
-      </section>
-    </main>
-  );
-}
-
-function toLocalInput(value: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - offset * 60_000);
-  return local.toISOString().slice(0, 16);
-}
+import type { Job,Operation,OperationStatus } from "@/types/database";
+type Filter="action"|"Cameron"|"Beth"|"due"|"waiting"|"done";
+type Draft={title:string;owner:"Cameron"|"Beth";due_at:string;notes:string;job_id:string;status:OperationStatus};
+const blank:Draft={title:"",owner:"Cameron",due_at:"",notes:"",job_id:"",status:"open"};
+export default function OpsPage(){const supabase=useMemo(()=>createBrowserClient(),[]),[ops,setOps]=useState<Operation[]>([]),[jobs,setJobs]=useState<Job[]>([]),[draft,setDraft]=useState<Draft>(blank),[editing,setEditing]=useState<Operation|null>(null),[filter,setFilter]=useState<Filter>("action"),[open,setOpen]=useState(false),[notice,setNotice]=useState(""),[openedAt]=useState(()=>Date.now());const load=useCallback(()=>Promise.all([supabase.from("operations").select("*").order("due_at",{ascending:true,nullsFirst:false}),supabase.from("jobs").select("*").not("status","in","(closed,cancelled)").order("start_at")]).then(([a,b])=>{setOps(a.data??[]);setJobs(b.data??[]);}),[supabase]);useEffect(()=>{load();},[load]);
+ const visible=ops.filter(o=>filter==="action"?["open","waiting"].includes(o.status):filter==="due"?o.status!=="done"&&!!o.due_at&&new Date(o.due_at).getTime()<openedAt+7*864e5:filter==="waiting"?o.status==="waiting":filter==="done"?o.status==="done":o.owner===filter);
+ async function submit(e:React.FormEvent){e.preventDefault();const payload={title:draft.title,owner:draft.owner,due_at:draft.due_at?new Date(draft.due_at).toISOString():null,notes:draft.notes||null,job_id:draft.job_id||null,status:draft.status,source:draft.owner==="Beth"?"beth" as const:"cameron" as const};const r=editing?await supabase.from("operations").update(payload).eq("id",editing.id).select().single():await supabase.from("operations").insert(payload).select().single();if(r.error){setNotice(r.error.message);return;}await supabase.from("activity_log").insert({operation_id:r.data.id,action:editing?"operation.updated":"operation.created",summary:`${r.data.title} assigned to ${r.data.owner}`,source:r.data.source,metadata:{}});setDraft(blank);setEditing(null);setOpen(false);setNotice("Operation saved");load();}
+ function edit(o:Operation){setEditing(o);setOpen(true);setDraft({title:o.title,owner:o.owner??"Cameron",due_at:toLocal(o.due_at),notes:o.notes??"",job_id:o.job_id??"",status:o.status});}
+ async function complete(o:Operation){const snapshot=o;setOps(items=>items.map(x=>x.id===o.id?{...x,status:"done"}:x));const r=await supabase.from("operations").update({status:"done"}).eq("id",o.id);if(r.error){setOps(items=>items.map(x=>x.id===snapshot.id?snapshot:x));setNotice(r.error.message);}else await supabase.from("activity_log").insert({operation_id:o.id,action:"operation.completed",summary:`Completed ${o.title}`,source:"cameron",metadata:{}});}
+ return <main className="page"><header className="page-head"><div><p className="eyebrow">Business operations</p><h1>Ops</h1><p>Work that may sit beside a job, but still needs an owner.</p></div><button className="icon-text-button" onClick={()=>{setEditing(null);setDraft(blank);setOpen(!open)}}><Plus size={17}/> New</button></header><div className="filter-row scroll">{(["action","Cameron","Beth","due","waiting","done"] as Filter[]).map(x=><button className={filter===x?"active":""} onClick={()=>setFilter(x)} key={x}>{x==="action"?"Needs action":x==="due"?"Due soon":statusLabel(x)}</button>)}</div>
+ {open?<form className="quick-form" onSubmit={submit}><h2>{editing?"Edit operation":"Quick entry"}</h2><input placeholder="What needs doing?" value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})} required/><div className="form-grid two"><select value={draft.owner} onChange={e=>setDraft({...draft,owner:e.target.value as "Cameron"|"Beth"})}><option>Cameron</option><option>Beth</option></select><input type="datetime-local" value={draft.due_at} onChange={e=>setDraft({...draft,due_at:e.target.value})}/></div><select value={draft.job_id} onChange={e=>setDraft({...draft,job_id:e.target.value})}><option value="">General operation</option>{jobs.map(j=><option value={j.id} key={j.id}>{j.title}</option>)}</select><textarea placeholder="Notes" value={draft.notes} onChange={e=>setDraft({...draft,notes:e.target.value})}/><div className="review-actions"><button type="submit">Save</button><button className="secondary-button" type="button" onClick={()=>setOpen(false)}>Cancel</button></div></form>:null}{notice?<p className="notice">{notice}</p>:null}
+ <section className="ops-list">{visible.map(o=><article className="ops-row" key={o.id}><button className={`complete-button ${o.status==="done"?"done":""}`} aria-label={`Complete ${o.title}`} onClick={()=>complete(o)}><Check size={16}/></button><div onClick={()=>edit(o)} role="button" tabIndex={0}><div><h2>{o.title}</h2><Pill tone={o.status==="waiting"?"warn":o.status==="done"?"good":"neutral"}>{statusLabel(o.status)}</Pill></div><p>{o.owner??"Team"} · {o.due_at?formatDateTime(o.due_at):"No due date"}</p>{o.job_id?<Link href={`/jobs/${o.job_id}`}>{jobs.find(j=>j.id===o.job_id)?.title??"Linked job"}</Link>:null}</div></article>)}</section></main>}
+function toLocal(v:string|null){if(!v)return"";const d=new Date(v),local=new Date(d.getTime()-d.getTimezoneOffset()*60000);return local.toISOString().slice(0,16)}

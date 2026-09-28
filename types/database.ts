@@ -51,6 +51,11 @@ export type Job = {
   source_email_thread_id: string | null;
   precedent_job_id: string | null;
   readiness: number;
+  contact_name: string | null;
+  contact_email: string | null;
+  arrival_at: string | null;
+  site_notes: Json;
+  tags: string[];
   created_at: string;
   updated_at: string;
 };
@@ -76,7 +81,37 @@ export type JobChange = {
   source: SourceKind;
   source_ref: string | null;
   requires_attention: boolean;
+  resolved_at: string | null;
+  resolution: string | null;
+  resolved_by: string | null;
   created_at: string;
+};
+
+export type JobRequirement = {
+  id: string; job_id: string; key: string; label: string; category: string;
+  applicable: boolean; resolved: boolean; detail: string | null; source: SourceKind;
+  created_at: string; updated_at: string;
+};
+
+export type JobDocument = {
+  id: string; job_id: string; name: string; category: string; storage_path: string | null;
+  external_url: string | null; mime_type: string | null; version: number; is_current: boolean;
+  source: SourceKind; notes: string | null; created_at: string;
+};
+
+export type JobDebrief = {
+  id: string; job_id: string; raw_text: string; source: SourceKind; created_at: string; updated_at: string;
+};
+
+export type JobMemory = {
+  id: string; job_id: string | null; client_id: string | null; debrief_id: string | null;
+  category: "keep" | "change_next_time" | "equipment_issue" | "missing_gear" | "client_follow_up" | "purchase_idea" | "technical_lesson" | "general";
+  summary: string; detail: string | null; tags: string[]; source: SourceKind; created_at: string;
+};
+
+export type IntegrationConnection = {
+  provider: "gmail" | "google_calendar" | "openai"; status: "disconnected" | "configured" | "connected" | "error";
+  account_label: string | null; last_synced_at: string | null; last_error: string | null; metadata: Json; updated_at: string;
 };
 
 export type PackItem = {
@@ -173,6 +208,12 @@ export type Database = {
         Update: Partial<TeamMember>;
         Relationships: [];
       };
+      job_requirements: { Row: JobRequirement; Insert: Partial<JobRequirement> & Pick<JobRequirement, "job_id" | "key" | "label">; Update: Partial<JobRequirement>; Relationships: []; };
+      job_documents: { Row: JobDocument; Insert: Partial<JobDocument> & Pick<JobDocument, "job_id" | "name">; Update: Partial<JobDocument>; Relationships: []; };
+      job_debriefs: { Row: JobDebrief; Insert: Partial<JobDebrief> & Pick<JobDebrief, "job_id" | "raw_text">; Update: Partial<JobDebrief>; Relationships: []; };
+      job_memories: { Row: JobMemory; Insert: Partial<JobMemory> & Pick<JobMemory, "category" | "summary">; Update: Partial<JobMemory>; Relationships: []; };
+      integration_connections: { Row: IntegrationConnection; Insert: Partial<IntegrationConnection> & Pick<IntegrationConnection, "provider">; Update: Partial<IntegrationConnection>; Relationships: []; };
+      sync_runs: { Row: { id: string; provider: string; status: string; started_at: string; finished_at: string | null; records_seen: number; records_changed: number; error: string | null; metadata: Json; }; Insert: Record<string, unknown>; Update: Record<string, unknown>; Relationships: []; };
     };
     Views: {};
     Functions: {};

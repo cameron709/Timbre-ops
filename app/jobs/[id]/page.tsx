@@ -1,243 +1,37 @@
 "use client";
-
-import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { use,useCallback,useEffect,useMemo,useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Link2, PackageCheck } from "lucide-react";
-import { EmptyState, Pill, Section } from "@/components/ui";
-import { formatDateTime, statusLabel } from "@/lib/format";
-import { jobStatuses, packStates } from "@/lib/status";
+import { ArrowLeft,Check,ExternalLink as ExternalIcon,FileText,Minus,Plus,Printer,Upload } from "lucide-react";
+import { EmptyState,Pill } from "@/components/ui";
+import { formatDateTime,statusLabel } from "@/lib/format";
+import { calculateReadiness } from "@/lib/readiness";
+import { jobStatuses,packStates } from "@/lib/status";
 import { createBrowserClient } from "@/lib/supabase/client";
-import type { Client, ExternalLink, Job, JobChange, PackItem } from "@/types/database";
+import type { Client,ExternalLink,Job,JobChange,JobDebrief,JobDocument,JobMemory,JobRequirement,PackItem } from "@/types/database";
 
-export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const supabase = useMemo(() => createBrowserClient(), []);
-  const [job, setJob] = useState<Job | null>(null);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [changes, setChanges] = useState<JobChange[]>([]);
-  const [packItems, setPackItems] = useState<PackItem[]>([]);
-  const [links, setLinks] = useState<ExternalLink[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    const [jobResult, clientResult, changeResult, packResult, linkResult] = await Promise.all([
-      supabase.from("jobs").select("*").eq("id", id).single(),
-      supabase.from("clients").select("*").order("name"),
-      supabase.from("job_changes").select("*").eq("job_id", id).order("created_at", { ascending: false }),
-      supabase.from("pack_items").select("*").eq("job_id", id).order("created_at"),
-      supabase.from("external_links").select("*").eq("job_id", id).order("created_at", { ascending: false })
-    ]);
-
-    setJob(jobResult.data ?? null);
-    setClients(clientResult.data ?? []);
-    setChanges(changeResult.data ?? []);
-    setPackItems(packResult.data ?? []);
-    setLinks(linkResult.data ?? []);
-  }, [id, supabase]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  async function saveJob(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!job) return;
-    setSaving(true);
-    setNotice(null);
-    const { error } = await supabase
-      .from("jobs")
-      .update({
-        status: job.status,
-        start_at: job.start_at,
-        end_at: job.end_at,
-        venue: job.venue,
-        client_id: job.client_id,
-        brief: job.brief,
-        readiness: job.readiness,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", job.id);
-
-    if (!error) {
-      await supabase.from("activity_log").insert({
-        job_id: job.id,
-        action: "job.updated",
-        summary: `${job.title} details updated`,
-        source: "cameron",
-        metadata: {}
-      });
-    }
-
-    setNotice(error ? error.message : "Job saved.");
-    setSaving(false);
-    load();
-  }
-
-  async function updatePackItem(item: PackItem, patch: Partial<PackItem>) {
-    const next = { ...item, ...patch, updated_at: new Date().toISOString() };
-    setPackItems((items) => items.map((candidate) => (candidate.id === item.id ? next : candidate)));
-    const { error } = await supabase.from("pack_items").update(patch).eq("id", item.id);
-    setNotice(error ? error.message : "Pack list saved.");
-  }
-
-  const client = clients.find((candidate) => candidate.id === job?.client_id);
-
-  if (!job) {
-    return (
-      <main className="page">
-        <Link className="meta" href="/jobs"><ArrowLeft size={16} /> Jobs</Link>
-        <EmptyState icon={PackageCheck} title="Job not available" body="It may be hidden by RLS or the record no longer exists." />
-      </main>
-    );
-  }
-
-  return (
-    <main className="page">
-      <header className="page-head">
-        <div>
-          <Link className="meta" href="/jobs">Back to jobs</Link>
-          <h1>{job.title}</h1>
-          <p>{formatDateTime(job.start_at)} {job.venue ? `· ${job.venue}` : ""}</p>
-        </div>
-        <Pill tone="good">{statusLabel(job.status)}</Pill>
-      </header>
-
-      <div className="two-col">
-        <section className="detail-panel">
-          <form className="form-grid" onSubmit={saveJob}>
-            <div className="form-grid two">
-              <label>
-                Status
-                <select value={job.status} onChange={(event) => setJob({ ...job, status: event.target.value as Job["status"] })}>
-                  {jobStatuses.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}
-                </select>
-              </label>
-              <label>
-                Readiness
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={job.readiness}
-                  onChange={(event) => setJob({ ...job, readiness: Number(event.target.value) })}
-                />
-              </label>
-            </div>
-
-            <div className="readiness" aria-label="Readiness">
-              <div className="progress"><span style={{ width: `${job.readiness}%` }} /></div>
-            </div>
-
-            <div className="form-grid two">
-              <label>
-                Start
-                <input type="datetime-local" value={toLocalInput(job.start_at)} onChange={(event) => setJob({ ...job, start_at: fromLocalInput(event.target.value) })} />
-              </label>
-              <label>
-                End
-                <input type="datetime-local" value={toLocalInput(job.end_at)} onChange={(event) => setJob({ ...job, end_at: fromLocalInput(event.target.value) })} />
-              </label>
-            </div>
-
-            <label>
-              Venue
-              <input value={job.venue ?? ""} onChange={(event) => setJob({ ...job, venue: event.target.value })} />
-            </label>
-
-            <label>
-              Client
-              <select value={job.client_id ?? ""} onChange={(event) => setJob({ ...job, client_id: event.target.value || null })}>
-                <option value="">No client linked</option>
-                {clients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select>
-            </label>
-
-            <label>
-              Brief
-              <textarea value={job.brief ?? ""} onChange={(event) => setJob({ ...job, brief: event.target.value })} />
-            </label>
-
-            <button type="submit" disabled={saving}>{saving ? "Saving..." : "Save job"}</button>
-            {notice ? <p className="form-message">{notice}</p> : null}
-          </form>
-        </section>
-
-        <Section title="Pack List">
-          <div className="pack-grid">
-            {!packItems.length ? <EmptyState icon={PackageCheck} title="No pack items yet" body="Assistant-added or manually added pack records will appear here." /> : null}
-            {packItems.map((item) => (
-              <article className="pack-item" key={item.id}>
-                <div className="card-row">
-                  <h3>{item.item_name}</h3>
-                  <select value={item.state} onChange={(event) => updatePackItem(item, { state: event.target.value as PackItem["state"] })}>
-                    {packStates.map((state) => <option key={state} value={state}>{statusLabel(state)}</option>)}
-                  </select>
-                </div>
-                <div className="quantity-grid">
-                  {(["quantity_planned", "quantity_packed", "quantity_out", "quantity_returned"] as const).map((field) => (
-                    <label key={field}>
-                      {statusLabel(field.replace("quantity_", ""))}
-                      <input
-                        type="number"
-                        min={0}
-                        value={item[field]}
-                        onChange={(event) => updatePackItem(item, { [field]: Number(event.target.value) })}
-                      />
-                    </label>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-        </Section>
-      </div>
-
-      <div className="two-col">
-        <Section title="Changes">
-          <div className="list">
-            {changes.map((change) => (
-              <article className="card" key={change.id}>
-                <h3>{change.summary}</h3>
-                {change.detail ? <p>{change.detail}</p> : null}
-                <p className="meta">{formatDateTime(change.created_at)} · {statusLabel(change.source)}</p>
-              </article>
-            ))}
-          </div>
-        </Section>
-
-        <Section title="Correspondence & Links">
-          <div className="list">
-            {client ? (
-              <article className="card">
-                <h3>{client.name}</h3>
-                <p className="meta">{client.email ?? "No email"} {client.phone ? `· ${client.phone}` : ""}</p>
-              </article>
-            ) : null}
-            {links.map((link) => (
-              <a className="card" key={link.id} href={link.external_url ?? "#"} target="_blank" rel="noreferrer">
-                <div className="card-row">
-                  <h3>{statusLabel(link.provider)}</h3>
-                  <Link2 size={17} />
-                </div>
-                <p className="meta">{link.external_id}</p>
-              </a>
-            ))}
-          </div>
-        </Section>
-      </div>
-    </main>
-  );
+const tabs=["overview","site","pack","files","changes","debrief"] as const;type Tab=(typeof tabs)[number];
+export default function JobDetailPage({params}:{params:Promise<{id:string}>}){
+ const{id}=use(params),supabase=useMemo(()=>createBrowserClient(),[]);const[job,setJob]=useState<Job|null>(null),[clients,setClients]=useState<Client[]>([]),[changes,setChanges]=useState<JobChange[]>([]),[pack,setPack]=useState<PackItem[]>([]),[links,setLinks]=useState<ExternalLink[]>([]),[requirements,setRequirements]=useState<JobRequirement[]>([]),[documents,setDocuments]=useState<JobDocument[]>([]),[debriefs,setDebriefs]=useState<JobDebrief[]>([]),[memories,setMemories]=useState<JobMemory[]>([]),[tab,setTab]=useState<Tab>("overview"),[notice,setNotice]=useState(""),[newPack,setNewPack]=useState(""),[debrief,setDebrief]=useState("");
+ const load=useCallback(async()=>{const[a,b,c,d,e,f,g,h,i]=await Promise.all([supabase.from("jobs").select("*").eq("id",id).single(),supabase.from("clients").select("*").order("name"),supabase.from("job_changes").select("*").eq("job_id",id).order("created_at",{ascending:false}),supabase.from("pack_items").select("*").eq("job_id",id).order("item_name"),supabase.from("external_links").select("*").eq("job_id",id),supabase.from("job_requirements").select("*").eq("job_id",id),supabase.from("job_documents").select("*").eq("job_id",id).order("created_at",{ascending:false}),supabase.from("job_debriefs").select("*").eq("job_id",id).order("created_at",{ascending:false}),supabase.from("job_memories").select("*").eq("job_id",id).order("created_at",{ascending:false})]);setJob(a.data);setClients(b.data??[]);setChanges(c.data??[]);setPack(d.data??[]);setLinks(e.data??[]);setRequirements(f.data??[]);setDocuments(g.data??[]);setDebriefs(h.data??[]);setMemories(i.data??[]);},[id,supabase]);
+ useEffect(()=>{load();const q=new URLSearchParams(window.location.search).get("tab");if(tabs.includes(q as Tab))setTab(q as Tab);},[load]);
+ if(!job)return <main className="page"><Link href="/jobs"><ArrowLeft size={16}/> Jobs</Link><EmptyState icon={FileText} title="Job not available" body="Check access or the job link."/></main>;
+ const currentJob=job,readiness=calculateReadiness(currentJob,requirements,pack),client=clients.find(c=>c.id===currentJob.client_id),site=(currentJob.site_notes??{}) as Record<string,string>;
+ async function save(patch:Partial<Job>,message="Job saved"){const next:Job={...currentJob,...patch};setJob(next);const result=await supabase.from("jobs").update({...patch,readiness:calculateReadiness(next,requirements,pack).score}).eq("id",id);setNotice(result.error?.message??message);if(!result.error)await supabase.from("activity_log").insert({job_id:id,action:"job.updated",summary:`${currentJob.title} details updated`,source:"cameron",metadata:{fields:Object.keys(patch)}});load();}
+ async function updatePack(item:PackItem,patch:Partial<PackItem>){setPack(p=>p.map(x=>x.id===item.id?{...x,...patch}:x));const r=await supabase.from("pack_items").update(patch).eq("id",item.id);if(r.error){setNotice(r.error.message);load();}}
+ async function addPack(){if(!newPack.trim())return;await supabase.from("pack_items").insert({job_id:id,item_name:newPack.trim(),quantity_planned:1});setNewPack("");load();}
+ async function upload(file:File){const path=`${id}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,"-")}`;const up=await supabase.storage.from("job-files").upload(path,file);if(up.error){setNotice(up.error.message);return;}await supabase.from("job_documents").insert({job_id:id,name:file.name,category:file.type.startsWith("image/")?"photo":"document",storage_path:path,mime_type:file.type,source:"cameron"});setNotice("File uploaded");load();}
+ async function openDocument(doc:JobDocument){if(doc.external_url){window.open(doc.external_url,"_blank","noopener");return;}if(doc.storage_path){const{data}=await supabase.storage.from("job-files").createSignedUrl(doc.storage_path,300);if(data?.signedUrl)window.open(data.signedUrl,"_blank","noopener");}}
+ async function resolve(change:JobChange){const{data}=await supabase.auth.getUser();await supabase.from("job_changes").update({resolved_at:new Date().toISOString(),resolved_by:data.user?.id??null,resolution:"Reviewed on job"}).eq("id",change.id);load();}
+ async function saveDebrief(){if(!debrief.trim())return;const{data,error}=await supabase.from("job_debriefs").insert({job_id:id,raw_text:debrief,source:"cameron"}).select().single();if(error){setNotice(error.message);return;}const lines=debrief.split(/\n|\./).map(x=>x.trim()).filter(Boolean);await supabase.from("job_memories").insert(lines.map(line=>({job_id:id,client_id:currentJob.client_id,debrief_id:data.id,category:/keep|worked well/i.test(line)?"keep" as const:/fault|broken|issue/i.test(line)?"equipment_issue" as const:/buy|purchase/i.test(line)?"purchase_idea" as const:"change_next_time" as const,summary:line,source:"cameron" as const})));setDebrief("");load();}
+ return <main className="page job-detail"><header className="job-header"><div><Link className="back-link" href="/jobs"><ArrowLeft size={15}/> Jobs</Link><h1>{job.title}</h1><p>{formatDateTime(job.start_at)}{job.venue?` · ${job.venue}`:""}</p></div><div className="job-head-actions"><Pill tone="good">{statusLabel(job.status)}</Pill><Link aria-label="Print job pack" title="Print job pack" href={`/jobs/${id}/pack`}><Printer size={19}/></Link></div></header>
+ <section className="readiness-panel"><div><span>Readiness</span><strong>{readiness.score}%</strong></div><div className="progress"><i style={{width:`${readiness.score}%`}}/></div><p>{readiness.blockers.length?`Still needs: ${readiness.blockers.join(", ")}`:"Core operational details are ready."}</p></section>
+ <nav className="detail-tabs" aria-label="Job sections">{tabs.map(item=><button className={tab===item?"active":""} onClick={()=>setTab(item)} type="button" key={item}>{statusLabel(item)}</button>)}</nav>{notice?<p className="notice">{notice}</p>:null}
+ {tab==="overview"?<section className="detail-layout"><div className="detail-section"><div className="section-head"><h2>Job brief</h2><button onClick={()=>save({brief:job.brief,intent:job.intent})} type="button">Save</button></div><label>Brief<textarea value={job.brief??""} onChange={e=>setJob({...job,brief:e.target.value})}/></label><label>Intent / scale<textarea value={job.intent??""} onChange={e=>setJob({...job,intent:e.target.value})}/></label></div><div className="detail-section"><h2>Core details</h2><label>Status<select value={job.status} onChange={e=>save({status:e.target.value as Job["status"]})}>{jobStatuses.map(s=><option value={s} key={s}>{statusLabel(s)}</option>)}</select></label><label>Venue<input value={job.venue??""} onChange={e=>setJob({...job,venue:e.target.value})} onBlur={()=>save({venue:job.venue})}/></label><label>Client<select value={job.client_id??""} onChange={e=>save({client_id:e.target.value||null})}><option value="">Not linked</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><div className="contact-block"><strong>{client?.name??"No client linked"}</strong><span>{client?.email??"No email"}{client?.phone?` · ${client.phone}`:""}</span></div></div></section>:null}
+ {tab==="site"?<section className="detail-section"><h2>Site & technical discovery</h2><div className="field-grid">{["power","cable_runs","foh","access","pa_coverage","projection","signal_data"].map(key=><label key={key}>{statusLabel(key)}<textarea value={site[key]??""} onChange={e=>setJob({...job,site_notes:{...site,[key]:e.target.value}})}/></label>)}</div><label>Arrival / access time<input type="datetime-local" value={toLocal(job.arrival_at)} onChange={e=>setJob({...job,arrival_at:e.target.value?new Date(e.target.value).toISOString():null})}/></label><button onClick={()=>save({site_notes:job.site_notes,arrival_at:job.arrival_at},"Site details saved")} type="button">Save site details</button></section>:null}
+ {tab==="pack"?<section className="detail-section"><div className="section-head"><div><h2>Pack list</h2><p>Tap quantities as equipment moves through the job.</p></div></div><div className="inline-add"><input placeholder="Add pack item" value={newPack} onChange={e=>setNewPack(e.target.value)}/><button onClick={addPack} aria-label="Add pack item" title="Add pack item"><Plus size={18}/></button></div><div className="pack-list">{pack.map(item=><article className="pack-row" key={item.id}><div><strong>{item.item_name}</strong><select value={item.state} onChange={e=>updatePack(item,{state:e.target.value as PackItem["state"]})}>{packStates.map(s=><option value={s} key={s}>{statusLabel(s)}</option>)}</select></div><div className="quantity-strip">{(["quantity_planned","quantity_packed","quantity_out","quantity_returned"] as const).map(field=><div key={field}><span>{statusLabel(field.replace("quantity_",""))}</span><div><button onClick={()=>updatePack(item,{[field]:Math.max(0,item[field]-1)})} aria-label={`Decrease ${field}`}><Minus size={14}/></button><strong>{item[field]}</strong><button onClick={()=>updatePack(item,{[field]:item[field]+1})} aria-label={`Increase ${field}`}><Plus size={14}/></button></div></div>)}</div>{item.quantity_out>item.quantity_returned?<p className="discrepancy">{item.quantity_out-item.quantity_returned} still outstanding</p>:null}</article>)}</div></section>:null}
+ {tab==="files"?<section className="detail-section"><div className="section-head"><div><h2>Files & correspondence</h2><p>Private job documents plus authoritative external links.</p></div><label className="upload-button"><Upload size={17}/> Upload<input hidden type="file" accept=".pdf,image/*,.txt" onChange={e=>e.target.files?.[0]&&upload(e.target.files[0])}/></label></div><div className="document-list">{documents.map(doc=><button onClick={()=>openDocument(doc)} className="document-row" key={doc.id}><FileText size={19}/><span><strong>{doc.name}</strong><small>{statusLabel(doc.category)} · v{doc.version} · {statusLabel(doc.source)}</small></span><ExternalIcon size={16}/></button>)}{links.map(link=><a className="document-row" href={link.external_url??"#"} target="_blank" rel="noreferrer" key={link.id}><ExternalIcon size={19}/><span><strong>{statusLabel(link.provider)}</strong><small>{link.external_id}</small></span></a>)}</div></section>:null}
+ {tab==="changes"?<section className="detail-section"><h2>Changes & history</h2><div className="change-stream">{changes.map(change=><article key={change.id}><span className="source-mark">{change.source[0].toUpperCase()}</span><span><strong>{change.summary}</strong><small>{change.detail}</small><small>{formatDateTime(change.created_at)} · {statusLabel(change.source)}</small></span>{change.requires_attention&&!change.resolved_at?<button onClick={()=>resolve(change)} title="Mark reviewed" aria-label="Mark reviewed"><Check size={16}/></button>:change.resolved_at?<Pill tone="good">Reviewed</Pill>:null}</article>)}</div></section>:null}
+ {tab==="debrief"?<section className="detail-section"><h2>Debrief & memory</h2><p>Write naturally. Each sentence becomes a reusable lesson, grouped by simple deterministic cues.</p><textarea className="debrief-input" value={debrief} onChange={e=>setDebrief(e.target.value)} placeholder="What worked? What changes next time? Any equipment issues or purchase ideas?"/><button onClick={saveDebrief} type="button">Save debrief</button><div className="memory-list">{memories.map(memory=><article key={memory.id}><Pill>{statusLabel(memory.category)}</Pill><strong>{memory.summary}</strong></article>)}</div>{debriefs.length?<p className="meta">{debriefs.length} original debrief{debriefs.length===1?"":"s"} retained.</p>:null}</section>:null}
+ </main>;
 }
-
-function toLocalInput(value: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - offset * 60_000);
-  return local.toISOString().slice(0, 16);
-}
-
-function fromLocalInput(value: string) {
-  return value ? new Date(value).toISOString() : null;
-}
+function toLocal(value:string|null){if(!value)return"";const d=new Date(value),local=new Date(d.getTime()-d.getTimezoneOffset()*60000);return local.toISOString().slice(0,16)}

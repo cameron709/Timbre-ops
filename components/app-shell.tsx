@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, ClipboardList, Home, PackageCheck, Settings2 } from "lucide-react";
+import { CalendarDays, ClipboardList, Home, LogOut, PackageCheck, Settings, Settings2 } from "lucide-react";
 import { AuthGate } from "@/components/auth-gate";
+import { createBrowserClient } from "@/lib/supabase/client";
 
 const nav = [
   { href: "/", label: "Home", icon: Home },
@@ -15,6 +16,7 @@ const nav = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const supabase = createBrowserClient();
 
   return (
     <AuthGate>
@@ -24,6 +26,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span>Timbre</span>
             <strong>Ops</strong>
           </Link>
+          <div className="topbar-actions">
+            <Link href="/settings" aria-label="Settings" title="Settings"><Settings size={19} /></Link>
+            <button type="button" aria-label="Sign out" title="Sign out" onClick={() => supabase.auth.signOut()}><LogOut size={19} /></button>
+          </div>
         </header>
         <div className="content-shell">{children}</div>
         <nav className="bottom-nav" aria-label="Primary">

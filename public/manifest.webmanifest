@@ -1,0 +1,10 @@
+{
+  "name": "Timbre Ops",
+  "short_name": "Timbre Ops",
+  "description": "Operational source of truth for Timbre Pro Audio.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f2ec",
+  "theme_color": "#12312b",
+  "icons": []
+}

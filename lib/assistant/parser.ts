@@ -9,12 +9,15 @@ export type AssistantIntent =
   | { type: "remember"; raw: string; jobHint: string | null; summary: string }
   | { type: "inform_arrival"; raw: string; jobHint: string; timeText: string }
   | { type: "find"; raw: string; query: string }
+  | { type: "find_memories"; raw: string; jobHint: string }
   | {
       type: "upsert_operation";
       raw: string;
       owner: "Cameron" | "Beth";
       title: string;
       dueAt: string | null;
+      dueDate: string | null;
+      duePrecision: "none" | "date";
     }
   | {
       type: "unknown";
@@ -44,6 +47,9 @@ export function parseAssistantCommand(input: string, now = new Date()): Assistan
   const raw = input.trim();
   const normalized = raw.replace(/\s+/g, " ");
 
+  const lessonsMatch = normalized.match(/^(?:what did we learn from|what should we remember (?:about|from)|show (?:me )?(?:the )?lessons from)\s+(?<job>.+?)\??$/i);
+  if (lessonsMatch?.groups) return { type: "find_memories", raw, jobHint: lessonsMatch.groups.job.trim() };
+
   const rememberMatch = normalized.match(/^(?:remember|next time[:,]?)\s+(?<summary>.+?)(?:\s+for\s+(?<job>.+))?$/i);
   if (rememberMatch?.groups) return { type: "remember", raw, summary: rememberMatch.groups.summary.trim(), jobHint: rememberMatch.groups.job?.trim() ?? null };
 
@@ -68,20 +74,29 @@ export function parseAssistantCommand(input: string, now = new Date()): Assistan
   const operationMatch = normalized.match(/^(?<owner>cameron|beth)\s+needs\s+to\s+(?<task>.+?)(?:\s+by\s+(?<due>.+))?$/i);
   if (operationMatch?.groups) {
     const owner = titleCaseName(operationMatch.groups.owner);
+    const dueAt = operationMatch.groups.due ? parseDueDate(operationMatch.groups.due, now) : null;
     return {
       type: "upsert_operation",
       raw,
       owner,
       title: titleCaseTask(operationMatch.groups.task),
-      dueAt: operationMatch.groups.due ? parseDueDate(operationMatch.groups.due, now) : null
+      dueAt,
+      dueDate: dueAt ? dateInPerth(dueAt) : null,
+      duePrecision: dueAt ? "date" : "none"
     };
   }
 
   return {
     type: "unknown",
     raw,
-      reason: "I can update a pack list, create an operation, remember a lesson, record site arrival, or find jobs and memories."
+      reason: "I did not change anything. Try “Add another DI to Mad Hatters”, “Beth needs to order a marquee by Wednesday”, “What did we learn from Mad Hatters?”, “Find Wine Show”, or include a job name when recording site arrival."
   };
+}
+
+function dateInPerth(value: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Perth", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 export function parseDueDate(phrase: string, now = new Date()) {

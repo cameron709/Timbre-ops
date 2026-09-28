@@ -1,0 +1,3 @@
+import type { AssistantIntent } from "@/lib/assistant/parser";
+export function packQuantityMutation(current:number,addition:number){if(!Number.isInteger(addition)||addition<1)throw new Error("Pack quantity addition must be a positive whole number.");return{before:current,after:current+addition,patch:{quantity_planned:current+addition}};}
+export function operationMutation(intent:Extract<AssistantIntent,{type:"upsert_operation"}>){return{owner:intent.owner,due_at:null,due_date:intent.dueDate,due_precision:intent.duePrecision,status:"open" as const,source:intent.owner==="Beth"?"beth" as const:"cameron" as const,notes:intent.raw};}

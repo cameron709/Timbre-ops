@@ -11,6 +11,7 @@ export function AssistantBox({ onDone }: { onDone?: () => void }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [responseResults, setResponseResults] = useState<{ id: string; title: string }[]>([]);
+  const [memoryResults, setMemoryResults] = useState<{ id: string; summary: string; category: string }[]>([]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -19,16 +20,18 @@ export function AssistantBox({ onDone }: { onDone?: () => void }) {
     setBusy(true);
     setResult(null);
     setResponseResults([]);
+    setMemoryResults([]);
     const { data } = await supabase.auth.getSession();
     const request = await fetch("/api/assistant", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${data.session?.access_token ?? ""}` },
       body: JSON.stringify({ text })
     });
-    const response = await request.json() as { ok: boolean; message: string; results?: { jobs?: { id: string; title: string }[] } };
+    const response = await request.json() as { ok: boolean; message: string; results?: { jobs?: { id: string; title: string }[]; memories?: { id: string; summary: string; category: string }[] } };
     setBusy(false);
     setResult(response.message);
     setResponseResults(response.results?.jobs ?? []);
+    setMemoryResults(response.results?.memories ?? []);
     if (response.ok) {
       setText("");
       onDone?.();
@@ -52,6 +55,7 @@ export function AssistantBox({ onDone }: { onDone?: () => void }) {
       </div>
       {result ? <p className="assistant-result">{result}</p> : null}
       {responseResults?.map((item) => <Link className="assistant-link" href={`/jobs/${item.id}`} key={item.id}>{item.title}</Link>)}
+      {memoryResults.map((item) => <div className="assistant-memory" key={item.id}><strong>{item.summary}</strong><small>{item.category.replaceAll("_", " ")}</small></div>)}
     </form>
   );
 }

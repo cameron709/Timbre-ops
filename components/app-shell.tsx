@@ -17,10 +17,11 @@ const nav = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const supabase = createBrowserClient();
+  const isLocalReview = process.env.NEXT_PUBLIC_ENABLE_REVIEW_FIXTURES === "1" && pathname.startsWith("/review");
+  const isPackReview = pathname === "/review/pack";
 
-  return (
-    <AuthGate>
-      <div className="app-shell">
+  const shell = (
+      <div className={`app-shell${isPackReview ? " pack-review-shell" : ""}`}>
         <header className="topbar">
           <Link href="/" className="wordmark" aria-label="Timbre Ops home">
             <span>Timbre</span>
@@ -45,6 +46,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
       </div>
-    </AuthGate>
   );
+
+  return isLocalReview ? shell : <AuthGate>{shell}</AuthGate>;
 }

@@ -44,6 +44,9 @@ export type Job = {
   venue: string | null;
   start_at: string | null;
   end_at: string | null;
+  date_precision: "date" | "timed";
+  start_date: string | null;
+  end_date: string | null;
   status: JobStatus;
   brief: string | null;
   intent: string | null;
@@ -54,6 +57,11 @@ export type Job = {
   contact_name: string | null;
   contact_email: string | null;
   arrival_at: string | null;
+  bump_in_at: string | null;
+  soundcheck_at: string | null;
+  status_override_reason: string | null;
+  status_override_at: string | null;
+  status_override_by: string | null;
   site_notes: Json;
   tags: string[];
   created_at: string;
@@ -65,6 +73,8 @@ export type Operation = {
   title: string;
   owner: "Cameron" | "Beth" | null;
   due_at: string | null;
+  due_date: string | null;
+  due_precision: "none" | "date" | "timed";
   status: OperationStatus;
   notes: string | null;
   job_id: string | null;
@@ -97,6 +107,7 @@ export type JobDocument = {
   id: string; job_id: string; name: string; category: string; storage_path: string | null;
   external_url: string | null; mime_type: string | null; version: number; is_current: boolean;
   source: SourceKind; notes: string | null; created_at: string;
+  size_bytes: number | null;
 };
 
 export type JobDebrief = {
@@ -107,6 +118,7 @@ export type JobMemory = {
   id: string; job_id: string | null; client_id: string | null; debrief_id: string | null;
   category: "keep" | "change_next_time" | "equipment_issue" | "missing_gear" | "client_follow_up" | "purchase_idea" | "technical_lesson" | "general";
   summary: string; detail: string | null; tags: string[]; source: SourceKind; created_at: string;
+  updated_at: string;
 };
 
 export type IntegrationConnection = {

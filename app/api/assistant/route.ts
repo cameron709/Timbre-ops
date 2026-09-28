@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { parseAssistantCommand } from "@/lib/assistant/parser";
 import { createRequestClient } from "@/lib/supabase/server";
+import { operationMutation, packQuantityMutation } from "@/lib/assistant/mutations";
 
 export async function POST(request: Request) {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -26,6 +27,15 @@ type Intent = ReturnType<typeof parseAssistantCommand>;
 
 async function executeIntent(supabase: Client, intent: Intent) {
   if (intent.type === "unknown") return { ok: false, message: intent.reason };
+  if (intent.type === "find_memories") {
+    const { data: jobs, error } = await supabase.from("jobs").select("id,title").ilike("title", `%${intent.jobHint}%`).limit(4);
+    if (error) throw error;
+    if (!jobs?.length) return { ok: false, message: `I did not change anything. No job matched “${intent.jobHint}”.` };
+    if (jobs.length > 1) return { ok: false, message: `I did not change anything. ${jobs.length} jobs matched; use the full job name.`, choices: jobs };
+    const { data: memories, error: memoryError } = await supabase.from("job_memories").select("id,summary,detail,job_id,category,source,created_at").eq("job_id", jobs[0].id).order("created_at", { ascending: false });
+    if (memoryError) throw memoryError;
+    return { ok: true, message: memories?.length ? `Found ${memories.length} saved lesson${memories.length === 1 ? "" : "s"} for ${jobs[0].title}.` : `No saved lessons yet for ${jobs[0].title}.`, results: { jobs, memories: memories ?? [] } };
+  }
   if (intent.type === "find") {
     const [jobs, memories] = await Promise.all([
       supabase.from("jobs").select("id,title,status,start_at").ilike("title", `%${intent.query}%`).limit(8),
@@ -35,13 +45,13 @@ async function executeIntent(supabase: Client, intent: Intent) {
   }
   if (intent.type === "upsert_operation") {
     const { data: matches } = await supabase.from("operations").select("*").ilike("title", `%${intent.title}%`).neq("status", "done").limit(1);
-    const payload = { owner: intent.owner, due_at: intent.dueAt, status: "open" as const, source: intent.owner === "Beth" ? "beth" as const : "cameron" as const, notes: intent.raw };
+    const payload = operationMutation(intent);
     const result = matches?.[0]
       ? await supabase.from("operations").update(payload).eq("id", matches[0].id).select().single()
       : await supabase.from("operations").insert({ ...payload, title: intent.title }).select().single();
     if (result.error) throw result.error;
     await supabase.from("activity_log").insert({ operation_id: result.data.id, action: matches?.[0] ? "operation.updated" : "operation.created", summary: `${result.data.title} assigned to ${intent.owner}`, source: payload.source, metadata: { assistant_command: intent.raw } });
-    return { ok: true, message: `${result.data.title} is assigned to ${intent.owner}${intent.dueAt ? `, due ${new Date(intent.dueAt).toLocaleDateString("en-AU")}` : ""}.` };
+    return { ok: true, message: `${matches?.[0] ? "Updated" : "Created"} “${result.data.title}”: owner ${intent.owner}${intent.dueDate ? `, due ${intent.dueDate} (date only)` : ", no due date"}.` };
   }
   const { data: jobs, error: jobError } = await supabase.from("jobs").select("*").ilike("title", `%${intent.type === "remember" ? intent.jobHint ?? "" : intent.jobHint}%`).limit(3);
   if (jobError) throw jobError;
@@ -68,7 +78,7 @@ async function executeIntent(supabase: Client, intent: Intent) {
   }
   const { data: items } = await supabase.from("pack_items").select("*").eq("job_id", job.id).ilike("item_name", `%${intent.itemHint}%`).limit(3);
   if ((items?.length ?? 0) > 1) return { ok: false, message: "I found multiple matching pack items. Use the exact item name." };
-  const current = items?.[0]; const nextQuantity = (current?.quantity_planned ?? 0) + intent.quantity;
+  const current = items?.[0]; const quantity = packQuantityMutation(current?.quantity_planned ?? 0, intent.quantity); const nextQuantity = quantity.after;
   const result = current
     ? await supabase.from("pack_items").update({ quantity_planned: nextQuantity }).eq("id", current.id).select().single()
     : await supabase.from("pack_items").insert({ job_id: job.id, item_name: intent.itemHint, quantity_planned: intent.quantity, notes: "Added from Timbre Ops assistant" }).select().single();
@@ -78,5 +88,5 @@ async function executeIntent(supabase: Client, intent: Intent) {
     supabase.from("job_changes").insert({ job_id: job.id, summary, detail: `${result.data.item_name} planned quantity is now ${result.data.quantity_planned}.`, source: "cameron", requires_attention: false }),
     supabase.from("activity_log").insert({ job_id: job.id, action: "pack_item.updated", summary, source: "cameron", metadata: { item_id: result.data.id, quantity_added: intent.quantity } })
   ]);
-  return { ok: true, message: `${result.data.item_name} is now planned at ${result.data.quantity_planned} for ${job.title}.` };
+  return { ok: true, message: `Changed ${job.title} pack list: ${result.data.item_name} planned quantity ${result.data.quantity_planned - intent.quantity} → ${result.data.quantity_planned}.` };
 }

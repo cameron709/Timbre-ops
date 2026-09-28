@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { AppShell } from "@/components/app-shell";
 import "./globals.css";
+import "./milestone.css";
+import "./review.css";
 
 export const metadata: Metadata = {
   title: "Timbre Ops",

@@ -21,6 +21,8 @@ describe("parseAssistantCommand", () => {
       expect(intent.owner).toBe("Beth");
       expect(intent.title).toBe("Order marquee");
       expect(intent.dueAt).toBe("2026-09-30T01:00:00.000Z");
+      expect(intent.dueDate).toBe("2026-09-30");
+      expect(intent.duePrecision).toBe("date");
     }
   });
 
@@ -47,6 +49,14 @@ describe("parseAssistantCommand", () => {
       type: "find",
       raw: "Find presentation laptop lessons",
       query: "presentation laptop lessons"
+    });
+  });
+
+  it("recognises a natural-language memory question", () => {
+    expect(parseAssistantCommand("What did we learn from Mad Hatters?")).toEqual({
+      type: "find_memories",
+      raw: "What did we learn from Mad Hatters?",
+      jobHint: "Mad Hatters"
     });
   });
 });

@@ -1,0 +1,20 @@
+.connection-stages { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+.integration-row { align-items: flex-start; }
+.integration-row > button { width: auto; flex: 0 0 auto; }
+.email-review { display: grid; gap: 22px; }
+.email-review > section { display: grid; gap: 10px; }
+.email-review h3 { margin: 0; font-size: .88rem; }
+.email-thread-list,.proposal-list { display: grid; gap: 10px; }
+.email-thread-list article,.proposal-list article { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 6px; padding: 13px; background: var(--panel2); }
+.email-thread-list article > div:first-child { display: grid; gap: 4px; min-width: 0; }
+.email-thread-list small,.proposal-head small { display: block; color: var(--muted); font-size: .75rem; }
+.email-thread-list p { color: var(--muted); margin: 4px 0; font-size: .82rem; }
+.email-thread-list a { display: inline-flex; align-items: center; gap: 5px; color: var(--orange); font-size: .78rem; }
+.email-thread-list button.active { border: 1px solid #315943; background: #17241c; color: var(--green); border-radius: 6px; min-height: 38px; padding: 0 12px; }
+.proposal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.proposal-head span { min-width: 0; }
+.proposal-list article.has-conflict { border-left: 3px solid var(--amber); }
+.proposal-list blockquote { margin: 0; padding: 9px 11px; border-left: 2px solid var(--faint); background: #101318; color: var(--muted); font-size: .8rem; }
+.check-label { display: flex; grid-template-columns: none; align-items: center; gap: 8px; }
+.check-label input { width: 17px; height: 17px; }
+@media(min-width:760px){.email-thread-list article{grid-template-columns:1fr auto}.email-thread-list article>.review-actions{align-self:start}}

@@ -5,7 +5,7 @@ export function jobPackContents(input: JobPackInput) {
   const unresolved = input.changes.filter((item) => item.requires_attention && !item.resolved_at);
   const plans = input.documents.filter(isPlanDocument);
   return {
-    sections: ["Schedule", "On-day contacts", "Venue and access", "Technical details", "Pack checklist", "Outstanding questions", "Plans and attachments"],
+    sections: ["Schedule", "On-day contacts", "Venue and access", "Technical details", "Programme, performers and changeovers", "Pack checklist", "Outstanding questions", "Plans and attachments"],
     unresolved,
     plans,
     hasActualPlan: plans.length > 0,

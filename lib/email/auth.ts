@@ -1,0 +1,2 @@
+import { createRequestClient } from "@/lib/supabase/server";
+export async function authorisedClient(request:Request){const token=request.headers.get("authorization")?.replace(/^Bearer\s+/i,"");if(!token)throw new Error("AUTH_REQUIRED");const supabase=createRequestClient(token);const{data}=await supabase.auth.getUser(token);if(!data.user)throw new Error("AUTH_REQUIRED");return{supabase,user:data.user,token};}

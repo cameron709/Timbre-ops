@@ -1,6 +1,6 @@
 import type { Job, JobRequirement, JobStatus, PackItem } from "@/types/database";
 export type ReadinessCheck = { key: string; label: string; ready: boolean; requiredForPacking: boolean };
-export type ReadinessResult = { score: number; blockers: string[]; checks: ReadinessCheck[] };
+export type ReadinessResult = { score: number; blockers: string[]; checks: ReadinessCheck[]; packingComplete: boolean };
 export type StatusGate = { allowed: boolean; blockers: string[]; requiresOverride: boolean };
 const packingStatuses: JobStatus[] = ["ready_to_pack", "packed", "on_site"];
 export function calculateReadiness(job: Job, requirements: JobRequirement[] = [], pack: PackItem[] = []): ReadinessResult {
@@ -15,11 +15,13 @@ export function calculateReadiness(job: Job, requirements: JobRequirement[] = []
   ];
   for (const requirement of requirements.filter((item) => item.applicable)) checks.push({ key: `requirement:${requirement.key}`, label: requirement.label, ready: requirement.resolved, requiredForPacking: true });
   const ready = checks.filter((check) => check.ready).length;
-  return { score: Math.round((ready / checks.length) * 100), blockers: checks.filter((check) => !check.ready).map((check) => check.label), checks };
+  const packingComplete = pack.length > 0 && pack.every((item) => item.quantity_planned > 0 && item.quantity_packed >= item.quantity_planned);
+  return { score: Math.round((ready / checks.length) * 100), blockers: checks.filter((check) => !check.ready).map((check) => check.label), checks, packingComplete };
 }
 export function evaluateStatusGate(target: JobStatus, readiness: ReadinessResult): StatusGate {
   if (!packingStatuses.includes(target)) return { allowed: true, blockers: [], requiresOverride: false };
   const blockers = readiness.checks.filter((check) => check.requiredForPacking && !check.ready).map((check) => check.label);
+  if ((target === "packed" || target === "on_site") && !readiness.packingComplete) blockers.push("All planned quantities packed");
   return { allowed: blockers.length === 0, blockers, requiresOverride: blockers.length > 0 };
 }
 export function effectiveStatusGate(target: JobStatus, readiness: ReadinessResult, overrideReason: string | null) {

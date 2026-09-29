@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import "./globals.css";
 import "./milestone.css";
 import "./review.css";
+import "./email-review.css";
 
 export const metadata: Metadata = {
   title: "Timbre Ops",

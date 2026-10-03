@@ -2,16 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, ClipboardList, Home, LogOut, PackageCheck, Settings, Settings2 } from "lucide-react";
+import { BriefcaseBusiness, ClipboardList, Home, LogOut, MoreHorizontal, PackageCheck, Settings } from "lucide-react";
 import { AuthGate } from "@/components/auth-gate";
 import { createBrowserClient } from "@/lib/supabase/client";
 
 const nav = [
   { href: "/", label: "Home", icon: Home },
   { href: "/jobs", label: "Jobs", icon: ClipboardList },
-  { href: "/ops", label: "Ops", icon: Settings2 },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/gear", label: "Gear", icon: PackageCheck }
+  { href: "/clients", label: "Clients", icon: BriefcaseBusiness },
+  { href: "/gear", label: "Gear", icon: PackageCheck },
+  { href: "/more", label: "More", icon: MoreHorizontal }
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

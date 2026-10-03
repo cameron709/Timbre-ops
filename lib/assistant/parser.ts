@@ -7,6 +7,7 @@ export type AssistantIntent =
       quantity: number;
     }
   | { type: "remember"; raw: string; jobHint: string | null; summary: string }
+  | { type: "capture_activity"; raw: string; contactHint: string | null; jobHint: string | null; activityType: "Phone Call" | "Note"; summary: string }
   | { type: "inform_arrival"; raw: string; jobHint: string; timeText: string }
   | { type: "find"; raw: string; query: string }
   | { type: "find_memories"; raw: string; jobHint: string }
@@ -56,6 +57,21 @@ export function parseAssistantCommand(input: string, now = new Date()): Assistan
   const informMatch = normalized.match(/^(?:.+?\s+said\s+)?(?:we\s+can\s+)?(?:get\s+)?(?:onto|on)\s+site\s+at\s+(?<time>\d{1,2}(?::\d{2})?\s*(?:am|pm)?)(?:\s+for\s+(?<job>.+))$/i);
   if (informMatch?.groups) return { type: "inform_arrival", raw, timeText: informMatch.groups.time, jobHint: informMatch.groups.job.trim() };
 
+  const activityMatch = normalized.match(/^(?:(?<contact>[A-Z][\w' -]{1,40})\s+)?(?<verb>called|rang|phoned|said|emailed|noted)\.?\s*(?<summary>.+)$/i);
+  if (activityMatch?.groups) {
+    const contactHint = activityMatch.groups.contact?.trim() ?? null;
+    const summary = activityMatch.groups.summary.trim();
+    const jobMatch = summary.match(/\b(?:for|about|re)\s+(?<job>[A-Z0-9][\w'& -]{2,60})(?:\.|,| and |$)/i);
+    return {
+      type: "capture_activity",
+      raw,
+      contactHint,
+      jobHint: jobMatch?.groups?.job?.trim() ?? null,
+      activityType: /called|rang|phoned/i.test(activityMatch.groups.verb) ? "Phone Call" : "Note",
+      summary
+    };
+  }
+
   const findMatch = normalized.match(/^(?:find|show me|search for)\s+(?<query>.+)$/i);
   if (findMatch?.groups) return { type: "find", raw, query: findMatch.groups.query.trim() };
 
@@ -89,7 +105,7 @@ export function parseAssistantCommand(input: string, now = new Date()): Assistan
   return {
     type: "unknown",
     raw,
-      reason: "I did not change anything. Try “Add another DI to Mad Hatters”, “Beth needs to order a marquee by Wednesday”, “What did we learn from Mad Hatters?”, “Find Wine Show”, or include a job name when recording site arrival."
+      reason: "I did not change anything. Try “Tammy called. NAIDOC access is now 7:30 and they want another handheld”, “Add another DI to Mad Hatters”, “Beth needs to order a marquee by Wednesday”, “What did we learn from Mad Hatters?”, or “Find Wine Show”."
   };
 }
 

@@ -2,21 +2,22 @@ import type { JobStatus, OperationStatus, PackState } from "@/types/database";
 
 export const jobStatuses: JobStatus[] = [
   "enquiry",
-  "assessing",
-  "site_discovery",
-  "quoting",
+  "scoping",
+  "quote_required",
   "quote_sent",
+  "awaiting_client",
   "confirmed",
-  "planning",
-  "ready_to_pack",
-  "packed",
-  "on_site",
-  "complete",
-  "debriefed",
+  "production",
+  "completed",
   "invoiced",
-  "closed",
-  "cancelled"
+  "paid",
+  "cancelled",
+  "lost",
+  "deferred"
 ];
+
+export const activeJobStatuses: JobStatus[] = ["enquiry", "scoping", "quote_required", "quote_sent", "awaiting_client", "confirmed", "production", "invoiced", "deferred"];
+export const closedJobStatuses: JobStatus[] = ["completed", "paid", "cancelled", "lost", "complete", "debriefed", "closed"];
 
 export const operationStatuses: OperationStatus[] = ["open", "waiting", "done", "cancelled"];
 export const packStates: PackState[] = ["planned", "packed", "out", "returned"];

@@ -8,45 +8,81 @@ export type Json =
 
 export type JobStatus =
   | "enquiry"
+  | "scoping"
+  | "quote_required"
+  | "quote_sent"
+  | "awaiting_client"
+  | "confirmed"
+  | "production"
+  | "completed"
+  | "invoiced"
+  | "paid"
+  | "cancelled"
+  | "lost"
+  | "deferred"
   | "assessing"
   | "site_discovery"
   | "quoting"
-  | "quote_sent"
-  | "confirmed"
   | "planning"
   | "ready_to_pack"
   | "packed"
   | "on_site"
   | "complete"
   | "debriefed"
-  | "invoiced"
-  | "closed"
-  | "cancelled";
+  | "closed";
 
 export type OperationStatus = "open" | "waiting" | "done" | "cancelled";
 export type PackState = "planned" | "packed" | "out" | "returned";
 export type SourceKind = "client" | "cameron" | "beth" | "email" | "calendar" | "ai_inference" | "system";
+export type PackLineType = "catalogue" | "hire" | "consumable" | "purchase" | "custom";
 
 export type Client = {
   id: string;
   name: string;
+  type: "Organisation" | "Local Government" | "School" | "Festival" | "Arts Organisation" | "Church" | "AV / Production Company" | "Private Client" | "Wedding Client" | "Other";
+  status: "Active" | "Prospect" | "Inactive";
+  email: string | null;
+  domain: string | null;
+  phone: string | null;
+  address: string | null;
+  billing_details: string | null;
+  notes: string | null;
+  tags: string[];
+  last_activity_at: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Contact = {
+  id: string;
+  client_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  display_name: string;
+  job_title: string | null;
   email: string | null;
   phone: string | null;
+  is_primary: boolean;
   notes: string | null;
   created_at: string;
   updated_at: string;
+  last_activity_at: string | null;
+  archived_at: string | null;
 };
 
 export type Job = {
   id: string;
   title: string;
   client_id: string | null;
+  primary_contact_id: string | null;
   venue: string | null;
   start_at: string | null;
   end_at: string | null;
   date_precision: "date" | "timed";
   start_date: string | null;
   end_date: string | null;
+  event_date: string | null;
   status: JobStatus;
   brief: string | null;
   intent: string | null;
@@ -66,6 +102,14 @@ export type Job = {
   status_override_reason: string | null;
   status_override_at: string | null;
   status_override_by: string | null;
+  quoted_value: number | null;
+  quote_reference: string | null;
+  invoice_reference: string | null;
+  quote_status: "not_required" | "required" | "draft" | "sent" | "accepted" | "declined" | null;
+  invoice_status: "not_invoiced" | "draft" | "sent" | "paid" | "overdue" | "void" | null;
+  source: string | null;
+  lost_reason: string | null;
+  archived_at: string | null;
   site_notes: Json;
   tags: string[];
   created_at: string;
@@ -85,6 +129,64 @@ export type Operation = {
   source: SourceKind;
   created_at: string;
   updated_at: string;
+};
+
+export type CrmActivity = {
+  id: string;
+  activity_type: "Email" | "Phone Call" | "Note" | "Meeting" | "File" | "Client Request" | "System Change" | "Quote" | "Invoice" | "Other";
+  client_id: string;
+  contact_id: string | null;
+  job_id: string | null;
+  direction: "inbound" | "outbound" | "internal" | null;
+  subject: string;
+  summary: string | null;
+  body: string | null;
+  source: string | null;
+  external_id: string | null;
+  occurred_at: string;
+  created_at: string;
+  created_by: string | null;
+};
+
+export type CrmTask = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: "To Do" | "Waiting" | "Done";
+  priority: "Normal" | "Important" | "Urgent";
+  due_date: string | null;
+  client_id: string | null;
+  contact_id: string | null;
+  job_id: string | null;
+  source_activity_id: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+  archived_at: string | null;
+};
+
+export type ClientImportBatch = {
+  id: string;
+  source: string;
+  notes: string | null;
+  created_at: string;
+  created_by: string | null;
+};
+
+export type ClientImportRow = {
+  id: string;
+  batch_id: string | null;
+  organisation: string | null;
+  contact_name: string | null;
+  email: string | null;
+  client_type: string | null;
+  client_status: string | null;
+  relationship_notes: string | null;
+  matched_client_id: string | null;
+  matched_contact_id: string | null;
+  import_status: "pending" | "imported" | "skipped" | "error";
+  error: string | null;
+  created_at: string;
 };
 
 export type JobChange = {
@@ -145,6 +247,39 @@ export type PackItem = {
   created_at: string;
   updated_at: string;
   source_ref: string | null;
+  gear_item_id: string | null;
+  line_type: PackLineType;
+  source_context: string | null;
+};
+
+export type GearItem = {
+  id: string;
+  name: string;
+  category: string;
+  quantity_owned: number;
+  description: string | null;
+  notes: string | null;
+  photo_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GearKit = {
+  id: string;
+  name: string;
+  description: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GearKitItem = {
+  id: string;
+  kit_id: string;
+  gear_item_id: string;
+  quantity: number;
+  notes: string | null;
+  created_at: string;
 };
 
 export type EmailThread = {
@@ -219,6 +354,12 @@ export type Database = {
         Update: Partial<Client>;
         Relationships: [];
       };
+      contacts: {
+        Row: Contact;
+        Insert: Partial<Contact> & Pick<Contact, "client_id" | "display_name">;
+        Update: Partial<Contact>;
+        Relationships: [];
+      };
       jobs: {
         Row: Job;
         Insert: Partial<Job> & Pick<Job, "title">;
@@ -243,6 +384,9 @@ export type Database = {
         Update: Partial<PackItem>;
         Relationships: [];
       };
+      gear_items: { Row: GearItem; Insert: Partial<GearItem> & Pick<GearItem, "name">; Update: Partial<GearItem>; Relationships: []; };
+      gear_kits: { Row: GearKit; Insert: Partial<GearKit> & Pick<GearKit, "name">; Update: Partial<GearKit>; Relationships: []; };
+      gear_kit_items: { Row: GearKitItem; Insert: Partial<GearKitItem> & Pick<GearKitItem, "kit_id" | "gear_item_id" | "quantity">; Update: Partial<GearKitItem>; Relationships: []; };
       external_links: {
         Row: ExternalLink;
         Insert: Partial<ExternalLink> & Pick<ExternalLink, "provider" | "external_id">;
@@ -255,6 +399,10 @@ export type Database = {
         Update: Partial<ActivityLog>;
         Relationships: [];
       };
+      crm_activities: { Row: CrmActivity; Insert: Partial<CrmActivity> & Pick<CrmActivity, "activity_type" | "client_id" | "subject">; Update: Partial<CrmActivity>; Relationships: []; };
+      tasks: { Row: CrmTask; Insert: Partial<CrmTask> & Pick<CrmTask, "title">; Update: Partial<CrmTask>; Relationships: []; };
+      client_import_batches: { Row: ClientImportBatch; Insert: Partial<ClientImportBatch>; Update: Partial<ClientImportBatch>; Relationships: []; };
+      client_import_rows: { Row: ClientImportRow; Insert: Partial<ClientImportRow>; Update: Partial<ClientImportRow>; Relationships: []; };
       team_members: {
         Row: TeamMember;
         Insert: TeamMember;

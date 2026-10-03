@@ -2,7 +2,7 @@ import type { Job, JobRequirement, JobStatus, PackItem } from "@/types/database"
 export type ReadinessCheck = { key: string; label: string; ready: boolean; requiredForPacking: boolean };
 export type ReadinessResult = { score: number; blockers: string[]; checks: ReadinessCheck[]; packingComplete: boolean };
 export type StatusGate = { allowed: boolean; blockers: string[]; requiresOverride: boolean };
-const packingStatuses: JobStatus[] = ["ready_to_pack", "packed", "on_site"];
+const packingStatuses: JobStatus[] = ["production", "ready_to_pack", "packed", "on_site"];
 export function calculateReadiness(job: Job, requirements: JobRequirement[] = [], pack: PackItem[] = []): ReadinessResult {
   const siteNotes = job.site_notes && typeof job.site_notes === "object" && !Array.isArray(job.site_notes) ? job.site_notes : {};
   const checks: ReadinessCheck[] = [
@@ -21,7 +21,7 @@ export function calculateReadiness(job: Job, requirements: JobRequirement[] = []
 export function evaluateStatusGate(target: JobStatus, readiness: ReadinessResult): StatusGate {
   if (!packingStatuses.includes(target)) return { allowed: true, blockers: [], requiresOverride: false };
   const blockers = readiness.checks.filter((check) => check.requiredForPacking && !check.ready).map((check) => check.label);
-  if ((target === "packed" || target === "on_site") && !readiness.packingComplete) blockers.push("All planned quantities packed");
+  if ((target === "production" || target === "packed" || target === "on_site") && !readiness.packingComplete) blockers.push("All planned quantities packed");
   return { allowed: blockers.length === 0, blockers, requiresOverride: blockers.length > 0 };
 }
 export function effectiveStatusGate(target: JobStatus, readiness: ReadinessResult, overrideReason: string | null) {

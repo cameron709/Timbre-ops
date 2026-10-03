@@ -1,9 +1,26 @@
-node_modules
-.next
+# dependencies
+node_modules/
+
+# build output and caches
+.next/
+out/
+dist/
+build/
+coverage/
+.turbo/
 tsconfig.tsbuildinfo
+
+# local environment and deployment state
 .env
-.env.local
-.vercel
-.DS_Store
-.env*
+.env.*
+!.env.example
+.vercel/
 supabase/.temp/
+
+# logs and OS files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store

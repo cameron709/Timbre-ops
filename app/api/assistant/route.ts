@@ -53,6 +53,37 @@ async function executeIntent(supabase: Client, intent: Intent) {
     await supabase.from("activity_log").insert({ operation_id: result.data.id, action: matches?.[0] ? "operation.updated" : "operation.created", summary: `${result.data.title} assigned to ${intent.owner}`, source: payload.source, metadata: { assistant_command: intent.raw } });
     return { ok: true, message: `${matches?.[0] ? "Updated" : "Created"} “${result.data.title}”: owner ${intent.owner}${intent.dueDate ? `, due ${intent.dueDate} (date only)` : ", no due date"}.` };
   }
+  if (intent.type === "capture_activity") {
+    const [contacts, jobs] = await Promise.all([
+      intent.contactHint ? supabase.from("contacts").select("*").ilike("display_name", `%${intent.contactHint}%`).limit(5) : Promise.resolve({ data: [], error: null }),
+      intent.jobHint ? supabase.from("jobs").select("*").ilike("title", `%${intent.jobHint}%`).limit(5) : supabase.from("jobs").select("*").limit(20)
+    ]);
+    if (contacts.error) throw contacts.error;
+    if (jobs.error) throw jobs.error;
+    const contact = contacts.data?.[0] ?? null;
+    const job = jobs.data?.find((item) => intent.jobHint ? true : intent.raw.toLowerCase().includes(item.title.toLowerCase())) ?? jobs.data?.[0] ?? null;
+    const clientId = contact?.client_id ?? job?.client_id;
+    if (!clientId) return { ok: false, message: "I heard the capture, but could not match a client or job yet. Add a client/contact name or job title." };
+    const activity = await supabase.from("crm_activities").insert({
+      activity_type: intent.activityType,
+      client_id: clientId,
+      contact_id: contact?.id ?? job?.primary_contact_id ?? null,
+      job_id: job?.id ?? null,
+      direction: intent.activityType === "Phone Call" ? "inbound" : "internal",
+      subject: intent.summary,
+      summary: intent.raw,
+      source: "capture",
+      occurred_at: new Date().toISOString()
+    }).select().single();
+    if (activity.error) throw activity.error;
+    if (job) {
+      await supabase.from("job_changes").insert({ job_id: job.id, summary: "Captured client update", detail: intent.summary, source: "cameron", requires_attention: true, source_ref: activity.data.id });
+      if (/(confirm|check|follow up|availability|invoice|quote|request)/i.test(intent.summary)) {
+        await supabase.from("tasks").insert({ title: taskTitle(intent.summary), client_id: clientId, contact_id: contact?.id ?? job.primary_contact_id ?? null, job_id: job.id, source_activity_id: activity.data.id, status: "To Do", priority: /urgent|today|asap/i.test(intent.summary) ? "Urgent" : "Normal" });
+      }
+    }
+    return { ok: true, message: `Captured ${intent.activityType.toLowerCase()}${job ? ` against ${job.title}` : ""}. I created a review item before changing production details.`, results: { jobs: job ? [{ id: job.id, title: job.title }] : [] } };
+  }
   const { data: jobs, error: jobError } = await supabase.from("jobs").select("*").ilike("title", `%${intent.type === "remember" ? intent.jobHint ?? "" : intent.jobHint}%`).limit(3);
   if (jobError) throw jobError;
   if (!jobs?.length) return { ok: false, message: "I could not match that to a job. Include the job name and try again." };
@@ -89,4 +120,9 @@ async function executeIntent(supabase: Client, intent: Intent) {
     supabase.from("activity_log").insert({ job_id: job.id, action: "pack_item.updated", summary, source: "cameron", metadata: { item_id: result.data.id, quantity_added: intent.quantity } })
   ]);
   return { ok: true, message: `Changed ${job.title} pack list: ${result.data.item_name} planned quantity ${result.data.quantity_planned - intent.quantity} → ${result.data.quantity_planned}.` };
+}
+
+function taskTitle(summary: string) {
+  const cleaned = summary.replace(/^.*?\b(?:need|needs|want|wants|asked for|requested)\b/i, "").trim();
+  return cleaned ? `Confirm ${cleaned}` : "Follow up captured client request";
 }

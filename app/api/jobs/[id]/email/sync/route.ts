@@ -5,6 +5,9 @@ import { classifyDocument } from "@/lib/email/extraction";
 import { buildGmailSearch, normalizeGmailThread, proposalsForNormalizedThread, type GmailThread } from "@/lib/email/gmail-import";
 import { gmailAccessToken, gmailFetch } from "@/lib/email/google";
 
+// Gmail uses Node crypto, Buffer, and server-side attachment parsers.
+export const runtime = "nodejs";
+
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;

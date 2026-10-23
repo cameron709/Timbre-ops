@@ -9,7 +9,21 @@ type ReviewData={links:JobEmailThread[];threads:EmailThread[];proposals:ImportPr
 export function JobEmailReview({jobId}:{jobId:string}){const supabase=useMemo(()=>createBrowserClient(),[]),[data,setData]=useState<ReviewData|null>(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[notes,setNotes]=useState<Record<string,string>>({}),[edits,setEdits]=useState<Record<string,unknown>>({}),[overrides,setOverrides]=useState<Record<string,boolean>>({});
 const api=useCallback(async(path:string,options?:RequestInit)=>{const{data:session}=await supabase.auth.getSession();return fetch(path,{...options,headers:{"content-type":"application/json",...options?.headers,authorization:`Bearer ${session.session?.access_token??""}`}});},[supabase]);
 const load=useCallback(async()=>{const response=await api(`/api/jobs/${jobId}/email`);setData(await response.json());},[api,jobId]);useEffect(()=>{load();},[load]);
-async function sync(){setBusy(true);setNotice("Searching Gmail for corroborated job threads…");const response=await api(`/api/jobs/${jobId}/email/sync`,{method:"POST"}),body=await response.json();setNotice(body.ok?`Found ${body.candidates} candidate thread(s) and staged ${body.proposals} proposal(s).`:body.error);setBusy(false);load();}
+async function sync(){
+  setBusy(true);
+  setNotice("Searching Gmail for corroborated job threads…");
+  try {
+    const response=await api(`/api/jobs/${jobId}/email/sync`,{method:"POST"});
+    const body=await response.json().catch(()=>null);
+    if(!response.ok||!body?.ok)throw new Error(body?.error??`Gmail sync failed (${response.status}). Please try again.`);
+    setNotice(`Found ${body.candidates} candidate thread(s) and staged ${body.proposals} proposal(s).`);
+    await load();
+  }catch(error){
+    setNotice(error instanceof Error?error.message:"Gmail sync failed. Please try again.");
+  }finally{
+    setBusy(false);
+  }
+}
 async function review(link:JobEmailThread,status:"included"|"excluded"){await api(`/api/jobs/${jobId}/email`,{method:"PATCH",body:JSON.stringify({linkId:link.id,status})});setNotice(status==="included"?"Thread included for proposal review.":"Thread excluded; its evidence was retained.");load();}
 async function decide(proposal:ImportProposal,action:"accept"|"reject"){const response=await api(`/api/jobs/${jobId}/email/proposals/${proposal.id}`,{method:"PATCH",body:JSON.stringify({action,editedValue:edits[proposal.id],note:notes[proposal.id]??null,confirmOverride:overrides[proposal.id]??false})}),body=await response.json();setNotice(body.message??body.error);if(body.requiresOverride)setNotice(`${body.message} Tick “Replace existing value” and add a decision note.`);load();}
 if(!data)return <EmptyState icon={Mail} title="Loading email review" body="Checking staged Gmail evidence."/>;const thread=(id:string)=>data.threads.find(item=>item.id===id),included=new Set(data.links.filter(link=>link.review_status==="included").map(link=>link.email_thread_id));return <div className="email-review"><div className="section-head"><div><h2>Gmail import review</h2><p className="meta">Candidate matching and extraction are deterministic. Nothing is confirmed until you accept it.</p></div><button className="icon-text-button" onClick={sync} disabled={busy}><RefreshCw size={16}/> Find emails</button></div>{notice?<p className="notice">{notice}</p>:null}

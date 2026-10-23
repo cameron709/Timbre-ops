@@ -1,11 +1,11 @@
 import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 export async function extractAttachmentText(bytes: Buffer, mimeType: string | null, filename: string) {
   if (bytes.length > MAX_ATTACHMENT_BYTES) throw new Error(`${filename} is larger than the 10 MB extraction limit.`);
   if (mimeType === "application/pdf" || filename.toLowerCase().endsWith(".pdf")) {
+    const { PDFParse } = await import("pdf-parse");
     const parser = new PDFParse({ data: new Uint8Array(bytes) });
     try {
       return (await parser.getText()).text.trim();

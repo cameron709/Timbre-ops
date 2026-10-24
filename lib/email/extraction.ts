@@ -276,7 +276,7 @@ export function extractProposals(evidence: Evidence): ExtractedProposal[] {
     if(addressMatch){
       results.push(proposal(evidence,"site_note",{key:"address",text:addressMatch[1].trim()},`Address: ${addressMatch[1].trim()}`,0.95,addressMatch[0]));
     }
-    const reception=cleanText.match(/(?:reception|mobile reception|phone reception)[^.!?]{0,180}(?:[.!?]|$)/i);
+    const reception=cleanText.match(/(?:reception|mobile reception|phone reception)[^.!?]{0,180}(?:[.!?]\s*(?:(?:Only\s+)?(?:Telstra|Optus|Vodafone)[^.!?]{0,120}[.!?]?)|[.!?]|$)/i);
     if(reception){
       results.push(proposal(evidence,"site_note",{key:"reception",text:reception[0].trim()},`Reception: ${reception[0].trim()}`,0.9,reception[0]));
     }

@@ -26,3 +26,15 @@
 :global(body):has(.display) { min-width:0; }
 
 .reviewNav a[aria-current="page"] { color:var(--accent); }
+
+.current .attention { color:var(--warning); border-left:2px solid var(--warning); padding:4px 0 4px 12px; margin:12px 0; font-size:16px; }
+@media(max-width:599px) {
+  .display { gap:20px; }
+  .local { margin:4px 0 16px; }
+  .current { margin-top:20px; }
+  .current h2 { margin-bottom:12px; }
+  .current .remaining { font-size:24px; }
+  .milestones li { padding:10px 0; }
+  .reviewNav { margin-bottom:12px; }
+}
+.replayLabel { color:var(--text-secondary); font-size:12px; margin:0 0 12px; }

@@ -2,7 +2,7 @@
 
 Entry: Job workspace → On The Day, `/jobs/[id]/on-the-day`.
 
-Local review: set `NEXT_PUBLIC_ENABLE_REVIEW_FIXTURES=1`, run `npm run dev -- --webpack --port 3010`, open `/review/on-the-day`. Scenarios: `pre`, `active`, `overrun`, `next-start`, `accumulated`, `curfew`, `curfew-delay`, `sparse`, `invalid`, `overnight` via `?scenario=`. Review times are fixed and displayed in Australia/Perth on both server and client to avoid hydration mismatches. Normal job views use the live device clock, resynchronise on focus/visibility and refresh the job every minute. No writes are made.
+Local review: set `NEXT_PUBLIC_ENABLE_REVIEW_FIXTURES=1`, run `npm run dev -- --webpack --port 3010`, open `/review/on-the-day`. Scenarios: `pre`, `active`, `overrun`, `next-start`, `accumulated`, `curfew`, `curfew-delay`, `sparse`, `invalid`, `overnight`, `evening` via `?scenario=`. Review times are fixed and displayed in Australia/Perth on both server and client to avoid hydration mismatches. Normal job views use the live device clock, resynchronise on focus/visibility and refresh the job every minute. No writes are made.
 
 ## Existing data limitations
 
@@ -21,11 +21,26 @@ Only explicitly dated ISO times with offsets or `Z` are accepted. A single start
 
 ## Inference policy
 
-The earliest item whose explicit finish has passed becomes the unresolved overrun anchor. A later scheduled start is not evidence of actual progression or recovery. The anchor remains likely active, with delay equal to elapsed time since its scheduled finish. All downstream items, including those whose original start is now past, remain in the projected sequence; the same accumulated delay shifts each start and the final known finish. Delay is applied once, not repeatedly summed for each item.
+The display separates expected phase progression from carried inferred delay. It never records a forecast as actual progress, and a scheduled start never clears delay.
 
-For example, an act ending at 20:30 is 9 minutes over at 20:39, 10 minutes over at 20:40 and 44 minutes over at 21:14. Changeover at 20:40 projects to 20:50 at 20:40, then 21:24 at 21:14. MC at 21:00 projects to 21:44 at 21:14. No scheduled boundary silently clears the delay.
+The pure engine replays a bounded forecast from the beginning. After each explicit finish, it infers overrun during the finish-to-next-start gap, capped at that original gap's duration. The delay is carried forward, and the next item becomes expected only at its shifted start. Its known duration is retained. Later gaps can add delay but cannot recover earlier delay. Contiguous items have no gap to infer additional overrun. Start-only items add no invented duration or delay. This is a deterministic modelling assumption, not evidence that an act actually ran late or a changeover actually began.
 
-This deliberately conservative inference can retain an early item for the rest of the event if nothing supplies stronger evidence. Phase 1 cannot know whether an act really finished, a changeover started, or time was recovered. It does not invent those observations. Updated source timings recompute the context; merely polling the same job does not reset it. The pure engine reconstructs the same result when opened late, reloaded or resumed, with no timer history or required input. The UI uses contextual “Likely active”, “Likely running” and “Projected next” language, with no permanent disclaimer. Start-only milestones can still advance by schedule until an explicit finish becomes unresolved.
+Example for the review evening:
+
+| Review time | Expected state | Carried delay | Projected finish |
+| --- | --- | --- | --- |
+| 20:39 | Rogue Pony / expected transition | 9 min | 22:02 |
+| 20:40 | Rogue Pony / expected transition | 10 min | 22:03 |
+| 20:50 | Changeover | 10 min | 22:03 |
+| 21:14 | Changeover / expected transition | 20 min | 22:13 |
+| 21:20 | MC | 20 min | 22:13 |
+| 22:30 | Programme expected to have finished | 20 min | 22:13 |
+
+This avoids retaining the first act indefinitely and avoids announcing recovery just because a scheduled boundary passed. Expected elapsed/remaining time uses shifted starts and ends. After the final projected end, the UI says the programme is expected to have finished; it never claims verified completion. Known delay remains. There is still no actual-progress source, so these projections can differ from reality, especially where schedule gaps are intentional breaks. Updated source timing recomputes the forecast. Reloading, resuming and opening late all reconstruct the same result without requiring input or saving timer history.
+
+The UI uses contextual Expected / Projected wording. A real curfew with ten minutes or less projected margin is placed inside the primary current-state zone, ahead of timing detail and Next, with no duplicate constraint panel. Other known deadlines remain secondary. No permanent uncertainty disclaimer is shown.
+
+`?scenario=evening` is a review-only automatic 60× replay of 19:50–22:30 AWST. It needs no Start/Stop controls, catches up after tab suspension and clamps at its final snapshot. Fixed scenarios remain available. The replay uses the production context engine; acceleration exists only in the fixture wrapper.
 
 Projected finish means the latest known item end, not departure/site-clear. Curfew arithmetic is shown only for an explicit Hard curfew line. Overlapping timed items, duplicate starts and invalid ranges suppress live schedule conclusions. Absolute timestamps support overnight and multi-day schedules; the device timezone determines display. No timezone is inferred from venue text.
 

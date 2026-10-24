@@ -171,7 +171,7 @@ export default function GearPage() {
                     {item.description ? <small>{item.description}</small> : null}
                   </div>
                   {item.item_type === "product" || item.item_type === "consumable" ? <label className="quantity-edit">Owned<input aria-label={`${item.name} quantity owned`} inputMode="numeric" value={item.quantity_owned} onChange={(event) => updateItem(item, { quantity_owned: Math.max(0, Number(event.target.value) || 0) })} /></label> : null}
-                  {allocation?.shortage ? <Pill tone="warn">Short {allocation.shortage}</Pill> : <Pill tone="quiet">{item.active ? "Active" : "Archived"}</Pill>}
+                  {allocation?.shortage ? <span className="stock-shortage">Short {allocation.shortage}</span> : <Pill tone="quiet">{item.active ? "Active" : "Archived"}</Pill>}
                 </article>
               );
             })}
@@ -190,7 +190,7 @@ export default function GearPage() {
           <button className="icon-text-button" onClick={addAsset} type="button"><Plus size={17} /> Add asset</button>
           </details>
           <div className="catalogue-list">
-            {assets.filter(asset => { const item = gearById.get(asset.gear_item_id); return item && matches(`${asset.asset_tag} ${asset.serial_number ?? ""} ${item.name}`, item.category); }).map((asset) => <article className="catalogue-row" key={asset.id}><div><strong>{asset.asset_tag} · {gearById.get(asset.gear_item_id)?.name ?? "Unknown item"}</strong><small>{asset.serial_number ? `S/N ${asset.serial_number} · ` : ""}{statusLabel(asset.status)} · {statusLabel(asset.condition)}</small></div><Pill tone={asset.status === "available" ? "good" : "warn"}>{statusLabel(asset.status)}</Pill></article>)}
+            {assets.filter(asset => { const item = gearById.get(asset.gear_item_id); return item && matches(`${asset.asset_tag} ${asset.serial_number ?? ""} ${item.name}`, item.category); }).map((asset) => <article className="catalogue-row" key={asset.id}><div><strong><span className="technical-id">{asset.asset_tag}</span> · {gearById.get(asset.gear_item_id)?.name ?? "Unknown item"}</strong><small>{asset.serial_number ? <span className="technical-id">S/N {asset.serial_number} · </span> : ""}{statusLabel(asset.status)} · {statusLabel(asset.condition)}</small></div><Pill tone={asset.status === "available" ? "good" : "warn"}>{statusLabel(asset.status)}</Pill></article>)}
             {!assets.length ? <p className="empty-inline">No individual assets yet. Mark a product as serialised, then add its physical units here.</p> : null}
           </div>
         </div>
@@ -236,7 +236,7 @@ export default function GearPage() {
         </div>
       </section>
 
-      <div className="gear-workspace" hidden={tab !== "allocations"}><section className="detail-section allocation-inspector">
+      <div className="gear-workspace" hidden={tab !== "allocations"}><section className="detail-section allocation-inspector signal-context">
         <h2>Allocation warnings</h2>
         {visibleWarnings.length ? visibleWarnings.map((item) => (
           <article className="allocation-row" key={item.gearItemId}>

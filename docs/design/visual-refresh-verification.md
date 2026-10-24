@@ -51,3 +51,31 @@ Inspect all five core screens at 320px and at the required sizes:
 - 1440px desktop
 
 Check long job/client names, empty briefing lists, shortages, large stock quantities, dense task lists, every job tab, keyboard focus and modal focus restoration. Confirm catalogue and package creation, task creation/completion, operation editing, document upload/download and status-gate workflows against an authorised test account. Print the review job pack and confirm the navigation/sidebar are absent and paper formatting is intact.
+
+## Issue #13: controlled character pass
+
+Implemented on `codex/visual-refresh-black-aluminium`, reviewed through PR #11.
+Both design specifications were read in full. No schema, authentication, data workflow,
+dependency or hosting configuration changes are part of this pass.
+
+- Native system font stack; ordinary names and headings wrap at word boundaries.
+  Filenames, email links, asset tags and serials retain targeted overflow handling.
+- Sidebar retained at 900px; generic detail columns begin at 1100px, with the
+  three-column workspace and 300px allocation inspector reserved for 1300px.
+- Live briefing statement uses the existing review count, including loading and
+  clear states. Dates, stock figures and shortages have stronger type hierarchy.
+- Short orange signal rails identify unresolved attention, focused job rows and
+  inspector context. Operational state retains semantic colour and text labels.
+- Subtle shell highlights and tonal surfaces; translucent depth only for overlays
+  and the wide allocation inspector. No imagery, textures or font assets added.
+- Tab indicators ease in, rows transition tonally, and readiness bars reveal once
+  on mount. Existing reduced-motion overrides disable all added motion.
+- Existing isolated review fixture now covers the character headline, long event
+  name, date-led row, long asset identifier, shortage and large stock quantities.
+  Printed pack styles and review access guard remain intact.
+
+Validation: typecheck, lint, 63 tests and production build pass.
+Local browser verification remains blocked by `listen EPERM` on 127.0.0.1:3109.
+Phone/iPad visual acceptance is pending on the Netlify Deploy Preview, including
+all six sizes listed above, keyboard focus, reduced motion and the printed pack.
+Do not merge or deploy to production before that review.

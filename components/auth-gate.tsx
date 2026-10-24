@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { Lock, Mail, KeyRound } from "lucide-react";
+import { Mail, KeyRound } from "lucide-react";
 import { createBrowserClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { BrandMark } from "@/components/brand-mark";
 
 type AuthGateProps = {
   children: React.ReactNode;
@@ -48,10 +49,8 @@ export function AuthGate({ children }: AuthGateProps) {
     return (
       <main className="auth-screen">
         <section className="auth-panel" aria-label="Configuration required">
-          <div className="brand-lock">
-            <Lock size={20} />
-          </div>
-          <h1>Timbre Ops</h1>
+          <BrandMark className="auth-brand" />
+          <h1>Operations</h1>
           <p>Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to run against Supabase.</p>
         </section>
       </main>
@@ -83,10 +82,8 @@ export function AuthGate({ children }: AuthGateProps) {
     return (
       <main className="auth-screen">
         <section className="auth-panel" aria-label="Sign in">
-          <div className="brand-lock">
-            <Lock size={20} />
-          </div>
-          <h1>Timbre Ops</h1>
+          <BrandMark className="auth-brand" />
+          <h1>Operations</h1>
           <p>Sign in with Supabase Auth to access live operations data.</p>
           <form onSubmit={signIn} className="auth-form">
             <label>

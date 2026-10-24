@@ -21,7 +21,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const matchJob = {
       title: job.title,
       venue: job.venue,
-      startDate: job.start_date ?? job.start_at,
+      startDate: job.start_date ?? job.start_at ?? job.event_date,
       clientName: client?.name,
       contactEmails: [job.contact_email, client?.email, ...clientContacts.map((contact) => contact.email)].filter(Boolean) as string[]
     };
@@ -34,6 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const normalized = threads.map((thread) => normalizeGmailThread(thread, matchJob)).filter((thread) => thread.match.eligible);
 
     let proposals = 0;
+    const generatedProposalKeys = new Set<string>();
     for (const thread of normalized) {
       const { data: storedThread, error: threadError } = await supabase.from("email_threads").upsert({
         gmail_thread_id: thread.id,
@@ -80,7 +81,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             client_id: job.client_id,
             contact_id: matchedContact?.id ?? job.primary_contact_id ?? null,
             job_id: id,
-            direction: matchedContact ? "inbound" : "internal",
+            direction: matchedContact ? "inbound" : fromEmail?.endsWith("@timbrepa.com.au") || fromEmail?.endsWith("@billcue.com.au") ? "outbound" : "inbound",
             subject: message.subject || thread.subject || "(no subject)",
             summary: message.snippet,
             body: message.body,
@@ -116,6 +117,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }
 
       for (const item of proposalsForNormalizedThread(thread)) {
+        generatedProposalKeys.add(item.idempotencyKey);
         const messageId = messageIds.get(item.sourceMessageId) ?? null;
         const emailAttachmentId = item.sourceAttachmentId ? attachmentIds.get(`${item.sourceMessageId}:${item.sourceAttachmentId}`) ?? null : null;
         const { error: proposalError } = await supabase.from("import_proposals").upsert({
@@ -131,18 +133,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           source_date: item.sourceDate,
           conflict_group: item.conflictGroup ?? null,
           idempotency_key: item.idempotencyKey
-        }, { onConflict: "idempotency_key", ignoreDuplicates: true });
+        }, { onConflict: "idempotency_key" });
         if (proposalError) throw proposalError;
         proposals++;
       }
     }
 
+    const { data: pending } = await supabase.from("import_proposals").select("id,idempotency_key").eq("job_id", id).eq("status", "pending");
+    const staleIds = (pending ?? []).filter((item) => !generatedProposalKeys.has(item.idempotency_key)).map((item) => item.id);
+    if (staleIds.length) {
+      const { error: cleanupError } = await supabase.from("import_proposals").delete().in("id", staleIds);
+      if (cleanupError) throw cleanupError;
+    }
+
     const now = new Date().toISOString();
     await Promise.all([
       supabase.from("integration_connections").upsert({ provider: "gmail", status: "connected", last_synced_at: now, last_error: null, metadata: { authenticated: true, retrieval: true, sync: true } }),
-      supabase.from("sync_runs").insert({ provider: "gmail", status: "succeeded", finished_at: now, records_seen: threads.length, records_changed: normalized.length, metadata: { job_id: id, query } })
+      supabase.from("sync_runs").insert({ provider: "gmail", status: "succeeded", finished_at: now, records_seen: threads.length, records_changed: normalized.length, metadata: { job_id: id, query, stale_proposals_removed: staleIds.length } })
     ]);
-    return NextResponse.json({ ok: true, candidates: normalized.length, proposals });
+    return NextResponse.json({ ok: true, candidates: normalized.length, proposals, staleProposalsRemoved: staleIds.length });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Gmail sync failed." }, { status: 400 });
   }

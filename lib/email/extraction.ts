@@ -165,10 +165,11 @@ export function extractProposals(evidence: Evidence): ExtractedProposal[] {
     }
   }
 
-  const dateRange=text.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s*(?:-|–|—|to)\s*(\d{1,2})(?:st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December)(?:\s+(20\d{2}))?/i);
+  const dateText=`${evidence.subject}\n${text}`;
+  const dateRange=dateText.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s*(?:-|–|—|to)\s*(\d{1,2})(?:st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December)(?:\s+(20\d{2}))?/i);
   if(dateRange){
     const startIndex=dateRange.index??0;
-    const nearby=text.slice(Math.max(0,startIndex-140),startIndex+dateRange[0].length+30);
+    const nearby=dateText.slice(Math.max(0,startIndex-140),startIndex+dateRange[0].length+30);
     const nearbyYear=nearby.match(/\b(20\d{2})\b/)?.[1];
     const sourceYear=evidence.sentAt?String(new Date(evidence.sentAt).getUTCFullYear()):undefined;
     const year=dateRange[5]??nearbyYear??sourceYear;

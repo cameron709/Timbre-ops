@@ -1,7 +1,7 @@
 .display { display:grid; gap:32px; font-variant-numeric:tabular-nums; padding-bottom:24px; }
 .primary,.secondary { min-width:0; }
 .clock { display:block; font-size:clamp(76px,17vw,148px); font-weight:500; letter-spacing:-.065em; line-height:1.05; }
-.local,.identity p,.current>p,.note { color:var(--text-secondary); }
+.local,.identity p,.current>p { color:var(--text-secondary); }
 .local { font-size:12px; margin:8px 0 24px; }
 .identity h1 { font-size:20px; font-weight:500; margin:0; }
 .identity p { margin:4px 0 0; }
@@ -17,11 +17,12 @@
 .projection { display:grid; gap:4px; color:var(--text-secondary); margin:0; }
 .projection strong,.deadline>strong { font-size:28px; color:var(--text-primary); font-weight:500; }
 .deadline { border-left:2px solid var(--line-strong); padding-left:16px; }
-.note { font-size:12px; max-width:44ch; margin:0; }
 @media(min-width:600px) { .display { padding:24px 8px; gap:48px; } .identity h1 { font-size:26px; } .current { margin-top:48px; } .secondary { max-width:650px; } }
-@media(min-width:1000px) and (orientation:landscape) { .display { grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr); gap:48px; align-items:start; } .secondary { padding-top:32px; } }
+@media(min-width:1000px) and (orientation:landscape) { .display:has(.secondary) { grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr); gap:48px; align-items:start; } .secondary { padding-top:32px; } }
 
 .reviewNav { display:flex; gap:16px; overflow-x:auto; margin-bottom:24px; }
 .reviewNav a { display:inline-flex; align-items:center; flex-shrink:0; min-height:44px; white-space:nowrap; }
 
 :global(body):has(.display) { min-width:0; }
+
+.reviewNav a[aria-current="page"] { color:var(--accent); }

@@ -2,7 +2,7 @@
 
 Entry: Job workspace → On The Day, `/jobs/[id]/on-the-day`.
 
-Local review: set `NEXT_PUBLIC_ENABLE_REVIEW_FIXTURES=1`, run `npm run dev -- --webpack --port 3010`, open `/review/on-the-day`. Scenarios: `pre`, `active`, `overrun`, `curfew`, `curfew-delay`, `sparse` via `?scenario=`. Review times are fixed and displayed in the device timezone. Normal job views use the live device clock, resynchronise on focus/visibility and refresh the job every minute. No writes are made.
+Local review: set `NEXT_PUBLIC_ENABLE_REVIEW_FIXTURES=1`, run `npm run dev -- --webpack --port 3010`, open `/review/on-the-day`. Scenarios: `pre`, `active`, `overrun`, `next-start`, `accumulated`, `curfew`, `curfew-delay`, `sparse`, `invalid`, `overnight` via `?scenario=`. Review times are fixed and displayed in the device timezone. Normal job views use the live device clock, resynchronise on focus/visibility and refresh the job every minute. No writes are made.
 
 ## Existing data limitations
 
@@ -21,7 +21,11 @@ Only explicitly dated ISO times with offsets or `Z` are accepted. A single start
 
 ## Inference policy
 
-The latest scheduled start is the best available evidence of progression. At an explicit finish, that item remains likely active until the next explicit start. Delay shifts future projected starts and the last known programme finish equally. At the next scheduled start, speculative drift resets; this is not an actual-progress measurement or a persisted delay history. Without actual timings, neither continued performance nor early completion can be known. The UI labels this uncertainty.
+The earliest item whose explicit finish has passed becomes the unresolved overrun anchor. A later scheduled start is not evidence of actual progression or recovery. The anchor remains likely active, with delay equal to elapsed time since its scheduled finish. All downstream items, including those whose original start is now past, remain in the projected sequence; the same accumulated delay shifts each start and the final known finish. Delay is applied once, not repeatedly summed for each item.
+
+For example, an act ending at 20:30 is 9 minutes over at 20:39, 10 minutes over at 20:40 and 44 minutes over at 21:14. Changeover at 20:40 projects to 20:50 at 20:40, then 21:24 at 21:14. MC at 21:00 projects to 21:44 at 21:14. No scheduled boundary silently clears the delay.
+
+This deliberately conservative inference can retain an early item for the rest of the event if nothing supplies stronger evidence. Phase 1 cannot know whether an act really finished, a changeover started, or time was recovered. It does not invent those observations. Updated source timings recompute the context; merely polling the same job does not reset it. The pure engine reconstructs the same result when opened late, reloaded or resumed, with no timer history or required input. The UI uses contextual “Likely active”, “Likely running” and “Projected next” language, with no permanent disclaimer. Start-only milestones can still advance by schedule until an explicit finish becomes unresolved.
 
 Projected finish means the latest known item end, not departure/site-clear. Curfew arithmetic is shown only for an explicit Hard curfew line. Overlapping timed items, duplicate starts and invalid ranges suppress live schedule conclusions. Absolute timestamps support overnight and multi-day schedules; the device timezone determines display. No timezone is inferred from venue text.
 

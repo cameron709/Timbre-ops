@@ -24,15 +24,35 @@ describe("On The Day time transitions", () => {
     expect(context.nextMilestones[0].projectedStart).toBe(at("20:47"));
     expect(context.projectedFinish).toBe(at("22:00"));
   });
-  it("advances at the next explicit start without retaining speculative drift", () => {
-    const context = deriveOnTheDay(schedule, at("20:40"));
-    expect(context.currentItem?.id).toBe("change"); expect(context.scheduleDriftMinutes).toBe(0);
-    expect(deriveOnTheDay(schedule, at("21:14")).currentItem?.id).toBe("mc");
+  it.each([
+    ["20:39", 9, "20:49", "21:09"],
+    ["20:40", 10, "20:50", "21:10"],
+    ["20:50", 20, "21:00", "21:20"],
+    ["21:00", 30, "21:10", "21:30"],
+    ["21:14", 44, "21:24", "21:44"],
+  ])("preserves unresolved drift at %s across downstream scheduled starts", (clock, delay, changeover, mc) => {
+    const context = deriveOnTheDay(schedule, at(clock as string));
+    expect(context.currentItem?.id).toBe("act");
+    expect(context.overrun).toBe(true);
+    expect(context.remainingMinutes).toBeUndefined();
+    expect(context.scheduleDriftMinutes).toBe(delay);
+    expect(context.nextMilestones.map(item => item.id)).toEqual(["change", "mc"]);
+    expect(context.nextMilestones.map(item => item.projectedStart)).toEqual([at(changeover as string), at(mc as string)]);
+    expect(context.projectedFinish).toBe(at("21:53") + Number(delay) * 60000);
+  });
+  it("produces identical accumulated delay when opened late or left untouched", () => {
+    const direct = deriveOnTheDay(schedule, at("21:14"));
+    for (let now = at("19:50"); now <= at("21:14"); now += 60000) {
+      const context = deriveOnTheDay(schedule, now);
+      if (now === at("21:14")) expect(context).toEqual(direct);
+    }
   });
   it("reduces real deadline margin under delay", () => {
     const data = { ...schedule, deadline: { label: "Hard curfew", at: at("22:00") } };
     expect(deriveOnTheDay(data, at("20:14")).hardDeadline?.marginMinutes).toBe(7);
     expect(deriveOnTheDay(data, at("20:37")).hardDeadline?.marginMinutes).toBe(0);
+    expect(deriveOnTheDay(data, at("20:40")).hardDeadline?.marginMinutes).toBe(-3);
+    expect(deriveOnTheDay(data, at("21:14")).hardDeadline?.marginMinutes).toBe(-37);
   });
   it("handles sparse and start-only timing", () => {
     expect(deriveOnTheDay({ items: [], warnings: [] }, at("20:14")).hasSchedule).toBe(false);
@@ -47,7 +67,12 @@ describe("On The Day time transitions", () => {
   });
   it("supports midnight with explicit dates", () => {
     const start = Date.parse("2026-10-24T23:30:00+08:00"), end = Date.parse("2026-10-25T00:30:00+08:00");
-    expect(deriveOnTheDay({ items: [{ id: "night", title: "Night", phase: "Show", start, end }], warnings: [] }, end - 60000).remainingMinutes).toBe(1);
+    const night = { items: [{ id: "night", title: "Night", phase: "Show", start, end }, { id: "pack", title: "Pack-down", phase: "Pack-down", start: end + 600000 }], warnings: [] };
+    expect(deriveOnTheDay(night, end - 60000).remainingMinutes).toBe(1);
+    const context = deriveOnTheDay(night, end + 1200000);
+    expect(context.currentItem?.id).toBe("night");
+    expect(context.scheduleDriftMinutes).toBe(20);
+    expect(context.nextMilestones[0].projectedStart).toBe(end + 1800000);
   });
   it("does not mutate input and marks the exact finish boundary", () => {
     const before = JSON.stringify(schedule); expect(deriveOnTheDay(schedule, at("20:30")).overrun).toBe(true);

@@ -46,9 +46,16 @@ export function deriveOnTheDay(schedule: DaySchedule, now: number) {
   const overlap = ordered.some((item, i) => ordered.slice(i + 1).some(next => item.end !== undefined && next.start < item.end && item.id !== "start_at"));
   if (invalid || overlap) warnings.push("Contradictory schedule timing. Review the run sheet before relying on live state.");
   const items = invalid || overlap ? [] : ordered;
-  const currentItem = items.filter(item => item.start <= now).at(-1);
+  // Scheduled starts are plans, not actual-progress evidence. Once an explicit
+  // finish is passed, retain the earliest unresolved item as the conservative
+  // anchor. Recompute from the full schedule so reloads, suspended tabs and
+  // opening late produce the same drift without relying on observation history.
+  const overdueItem = items.find(item => item.end !== undefined && now >= item.end);
+  const currentItem = overdueItem ?? items.filter(item => item.start <= now).at(-1);
   const drift = currentItem?.end !== undefined ? Math.max(0, now - currentItem.end) : 0;
-  const nextMilestones = items.filter(item => item.start > now).slice(0, 2).map(item => ({ ...item, projectedStart: item.start + drift }));
+  const currentIndex = currentItem ? items.indexOf(currentItem) : -1;
+  const nextMilestones = items.slice(currentIndex + 1, currentIndex + 3)
+    .map(item => ({ ...item, projectedStart: item.start + drift }));
   const finishes = items.flatMap(item => item.end === undefined ? [] : [item.end]);
   const projectedFinish = finishes.length ? Math.max(...finishes) + drift : undefined;
   return {

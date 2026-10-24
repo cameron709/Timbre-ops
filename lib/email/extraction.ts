@@ -121,6 +121,14 @@ function semanticConflictKey(item: ExtractedProposal) {
   return item.fieldKey;
 }
 
+function semanticConflictValue(item: ExtractedProposal) {
+  if (item.fieldKey==="contact"&&typeof item.value==="object"&&item.value) {
+    const contact=item.value as Record<string,unknown>;
+    return String(contact.email??contact.name??"").trim().toLowerCase();
+  }
+  return JSON.stringify(item.value);
+}
+
 export function extractProposals(evidence: Evidence): ExtractedProposal[] {
   const cleanText = stripQuotedHistory(evidence.body);
   const text = cleanText.replace(/\s+/g, " ").trim();
@@ -328,7 +336,7 @@ export function markConflicts(proposals: ExtractedProposal[]) {
     const conflictKey = semanticConflictKey(item);
     if (!conflictKey) continue;
     const group = values.get(conflictKey) ?? new Set<string>();
-    group.add(JSON.stringify(item.value));
+    group.add(semanticConflictValue(item));
     values.set(conflictKey, group);
   }
   return proposals.map((item) => {

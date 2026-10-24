@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export type Evidence = { threadId: string; messageId: string; sentAt: string | null; subject: string; body: string; from?: string; attachmentId?: string; filename?: string; mimeType?: string };
+export type Evidence = { threadId: string; messageId: string; sentAt: string | null; subject: string; body: string; from?: string; knownContact?: boolean; attachmentId?: string; filename?: string; mimeType?: string };
 export type ExtractedProposal = { fieldKey: string; value: unknown; text: string; confidence: number; excerpt: string; sourceDate: string | null; sourceMessageId: string; sourceAttachmentId?: string; idempotencyKey: string; conflictGroup?: string };
 
 const key = (e: Evidence, field: string, text: string) => createHash("sha256").update(`${e.messageId}:${e.attachmentId ?? "body"}:${field}:${text}`).digest("hex");
@@ -62,7 +62,7 @@ function dateFromMatch(match: RegExpMatchArray) {
 }
 
 function externalContact(evidence: Evidence, cleanText: string) {
-  if (!evidence.from) return null;
+  if (!evidence.from || evidence.knownContact === false) return null;
   const email = evidence.from.match(/[\w.+-]+@[\w.-]+/)?.[0]?.toLowerCase();
   if (!email || /@timbrepa\.com\.au$|@billcue\.com\.au$/i.test(email)) return null;
   const displayName = evidence.from.replace(/<[^>]+>/g, "").replace(/^['\"]|['\"]$/g, "").trim();

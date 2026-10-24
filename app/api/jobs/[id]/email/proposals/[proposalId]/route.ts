@@ -3,6 +3,9 @@ import { authorisedClient } from "@/lib/email/auth";
 import { gmailAccessToken,gmailFetch } from "@/lib/email/google";
 import type { ImportProposal,Job } from "@/types/database";
 
+// Gmail import relies on Node crypto, Buffer, and server-side attachment parsing.
+export const runtime = "nodejs";
+
 const toTimestamp=(job:Job,value:unknown)=>{const time=typeof value==="object"&&value&&"time" in value?String((value as {time:unknown}).time):"";const date=job.start_date??job.start_at?.slice(0,10)??job.event_date;if(!date||!/^[0-2]\d:[0-5]\d$/.test(time))throw new Error("Confirm the event date before accepting this time.");return new Date(`${date}T${time}:00+08:00`).toISOString();};
 const existingValue=(job:Job,field:string)=>field==="contact"?(job.contact_name?{name:job.contact_name,email:job.contact_email}:null):(job as unknown as Record<string,unknown>)[field];
 const describeValue=(field:string,value:unknown)=>{if(typeof value==="object"&&value){const item=value as Record<string,unknown>;if(item.time)return `${field.replaceAll("_"," ")}: ${item.time}`;if(item.date)return `event date: ${item.date}`;if(field==="contact")return `${item.name??"Contact"}${item.phone?` · ${item.phone}`:""}`;if(field==="pack_item")return `${item.quantity??1} × ${item.name??"Pack item"}`;if(field==="requirement")return String(item.label??"Production requirement");}if(field==="quoted_value")return `quoted value: $${Number(value).toFixed(2)}`;if(field==="programme_notes")return"Programme notes";return`${field.replaceAll("_"," ")}: ${String(value)}`;};

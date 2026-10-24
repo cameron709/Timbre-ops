@@ -42,22 +42,50 @@ export function deriveOnTheDay(schedule: DaySchedule, now: number) {
   const warnings = [...schedule.warnings];
   const ordered = [...schedule.items].sort((a, b) => a.start - b.start);
   const invalid = ordered.some((item, i) => !Number.isFinite(item.start) || (item.end !== undefined && (!Number.isFinite(item.end) || item.end <= item.start)) || (i > 0 && item.start === ordered[i - 1].start));
-  // Programme ranges may sit inside the overall Show range. Other overlaps are ambiguous.
-  const overlap = ordered.some((item, i) => ordered.slice(i + 1).some(next => item.end !== undefined && next.start < item.end && item.id !== "start_at"));
+  // The adapter removes the broad Show envelope when detailed programme exists.
+  // Any remaining overlapping explicit ranges are ambiguous.
+  const overlap = ordered.some((item, i) => ordered.slice(i + 1).some(next => item.end !== undefined && next.start < item.end));
   if (invalid || overlap) warnings.push("Contradictory schedule timing. Review the run sheet before relying on live state.");
   const items = invalid || overlap ? [] : ordered;
-  const currentItem = items.filter(item => item.start <= now).at(-1);
-  const drift = currentItem?.end !== undefined ? Math.max(0, now - currentItem.end) : 0;
-  const nextMilestones = items.filter(item => item.start > now).slice(0, 2).map(item => ({ ...item, projectedStart: item.start + drift }));
+  // Replay a bounded forecast, not an actual-progress log. Infer overrun in
+  // each finish-to-next-start gap, capped at that gap's length; carry it forward.
+  // Advance only at the shifted start, with no reduction in accumulated delay.
+  let drift = 0;
+  let currentIndex = -1;
+  let projectedStart: number | undefined;
+  let projectedEnd: number | undefined;
+  let expectedFinished = false;
+  for (let index = 0; index < items.length; index++) {
+    const item = items[index];
+    const start = item.start + drift;
+    if (now < start) break;
+    currentIndex = index;
+    projectedStart = start;
+    projectedEnd = item.end === undefined ? undefined : item.end + drift;
+    const next = items[index + 1];
+    if (!next) {
+      expectedFinished = projectedEnd !== undefined && now >= projectedEnd;
+      break;
+    }
+    if (item.end !== undefined && projectedEnd !== undefined) {
+      const gap = Math.max(0, next.start - item.end);
+      drift += Math.min(Math.max(0, now - projectedEnd), gap);
+    }
+    if (now < next.start + drift) break;
+  }
+  const currentItem = expectedFinished || currentIndex < 0 ? undefined : items[currentIndex];
+  const nextMilestones = items.slice(currentIndex + 1, currentIndex + 3)
+    .map(item => ({ ...item, projectedStart: item.start + drift }));
   const finishes = items.flatMap(item => item.end === undefined ? [] : [item.end]);
   const projectedFinish = finishes.length ? Math.max(...finishes) + drift : undefined;
   return {
     currentItem, nextMilestones, warnings: [...new Set(warnings)],
-    currentPhase: currentItem?.phase,
-    elapsedMinutes: currentItem ? Math.floor((now - currentItem.start) / minute) : undefined,
-    remainingMinutes: currentItem?.end !== undefined && now < currentItem.end ? Math.ceil((currentItem.end - now) / minute) : undefined,
+    currentPhase: expectedFinished ? "After programme" : currentItem?.phase,
+    currentProjectedStart: projectedStart, currentProjectedEnd: projectedEnd, expectedFinished,
+    elapsedMinutes: currentItem ? Math.floor((now - projectedStart!) / minute) : undefined,
+    remainingMinutes: currentItem && projectedEnd !== undefined && now < projectedEnd ? Math.ceil((projectedEnd - now) / minute) : undefined,
     countdownMinutes: !currentItem && nextMilestones[0] ? Math.ceil((nextMilestones[0].start - now) / minute) : undefined,
-    overrun: currentItem?.end !== undefined && now >= currentItem.end,
+    overrun: Boolean(currentItem && projectedEnd !== undefined && now >= projectedEnd),
     scheduleDriftMinutes: Math.ceil(drift / minute), projectedFinish,
     hardDeadline: schedule.deadline && Number.isFinite(schedule.deadline.at) ? { ...schedule.deadline, marginMinutes: projectedFinish === undefined ? undefined : Math.floor((schedule.deadline.at - projectedFinish) / minute) } : undefined,
     hasSchedule: ordered.length > 0,

@@ -343,3 +343,68 @@ Review the Netlify deploy preview at:
 - 1440px desktop
 
 Do not merge to production until the updated preview has been reviewed.
+
+
+## 16. Timbre Pro Audio logo
+
+Use the **actual Timbre Pro Audio brand logo**, not a recreated text wordmark and not an AI-generated approximation.
+
+Current official source of truth:
+
+`https://timbrepa.com.au/`
+
+The live site currently exposes the white Timbre Pro Audio logo asset at:
+
+`https://images.squarespace-cdn.com/content/66af73533f79120d397e78d1/85a060c9-1f1f-4532-a81d-6a0ad8cc6f74/Timbre_white.png?content-type=image%2Fpng&format=1500w`
+
+### Asset handling
+
+- Download/copy the official logo into the repository under `public/brand/`.
+- Do **not** hotlink the production app to Squarespace.
+- Preserve transparency and aspect ratio.
+- Do not redraw, simplify, trace, distort, recolour, or modify the mark.
+- If a higher-quality original SVG/vector asset becomes available later, it should replace the PNG without changing layout contracts.
+
+Recommended filename:
+
+`public/brand/timbre-pro-audio-white.png`
+
+### Placement
+
+**Phone**
+- Use the logo in the top app chrome at a restrained size.
+- It should identify the product without consuming useful vertical space.
+- Do not repeat the full logo on every screen body.
+- Bottom navigation remains icon/label based.
+
+**iPad / desktop**
+- Use the logo prominently but calmly at the top of the persistent sidebar.
+- Remove the generic text-only `Timbre Ops` wordmark when the real logo is present.
+- A small secondary `OPS` or `Operations` label may sit below/beside the brand mark if it helps distinguish the internal application from the public business brand.
+
+**Auth / sign-in**
+- Use the real logo as the primary brand element.
+- Do not use the existing generic orange square as the dominant brand mark.
+
+### Sizing and treatment
+
+- Maintain the original aspect ratio.
+- Never stretch the logo.
+- Use enough clear space around it.
+- Prefer the white logo on the graphite/black shell.
+- Do not put the logo inside a pill, glossy tile, orange block, or decorative card.
+- Do not add a drop shadow or glow to the logo.
+- The logo itself should provide the brand recognition; the orange signal system remains separate.
+
+### Product-brand relationship
+
+The interface is **Timbre Ops**, but the owner brand is **Timbre Pro Audio**.
+
+The UI should communicate this as:
+
+`[Timbre Pro Audio logo]`
+`OPS`
+
+rather than inventing a new standalone Timbre Ops logo.
+
+The app should feel like a professional internal product made by Timbre Pro Audio, not a separate unrelated software brand.

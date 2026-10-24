@@ -3,7 +3,7 @@ import { allocationSummary, expandKitLines, warningForPackLine } from "@/lib/gea
 import type { GearItem, Job, PackItem } from "@/types/database";
 
 const now = "2026-09-29T00:00:00Z";
-const di = { id: "di", name: "DI Box", category: "audio", quantity_owned: 4, description: null, notes: null, photo_url: null, created_at: now, updated_at: now } satisfies GearItem;
+const di = { id: "di", name: "DI Box", category: "audio", quantity_owned: 4, description: null, notes: null, photo_url: null, item_type: "product", tracking_mode: "pooled", unit: "each", active: true, sku: null, default_rate: null, replacement_value: null, created_at: now, updated_at: now } satisfies GearItem;
 const jobA = { id: "mad", title: "Mad Hatters Tea Party", start_date: "2026-10-02", start_at: null, date_precision: "date" } as Job;
 const jobB = { id: "noongar", title: "Noongar Festival", start_date: "2026-10-02", start_at: null, date_precision: "date" } as Job;
 const line = (patch: Partial<PackItem>): PackItem => ({
@@ -21,7 +21,10 @@ const line = (patch: Partial<PackItem>): PackItem => ({
   source_ref: patch.source_ref ?? null,
   gear_item_id: patch.gear_item_id ?? null,
   line_type: patch.line_type ?? "catalogue",
-  source_context: patch.source_context ?? null
+  source_context: patch.source_context ?? null,
+  booking_id: patch.booking_id ?? null,
+  package_id: patch.package_id ?? null,
+  asset_id: patch.asset_id ?? null
 });
 
 describe("gear allocation", () => {

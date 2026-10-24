@@ -193,7 +193,7 @@ export function extractProposals(evidence: Evidence): ExtractedProposal[] {
   }
 
   const labelledVenue = cleanText.match(/(?:^|\n)\s*(?:location|venue)\s*:\s*([^\n\r]{3,100})/im);
-  const navigationVenue=cleanText.match(/(?:just\s+)?put in\s+["“]?([^"”\n\r]{3,100})["”]?/i);
+  const navigationVenue=cleanText.match(/(?:just\s+)?(?:put in|navigate to)\s+["“]?([^"”\n\r,]{3,100})["”]?/i);
   const venue = labelledVenue?.[1]?.trim() ?? navigationVenue?.[1]?.trim() ?? text.match(/\b(?:held |happening )?at\s+([A-Z][A-Za-z0-9 '&.-]{3,60}?)(?=\s*(?:[,.]|on\s+(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|from\s+\d|$))/)?.[1]?.trim();
   if (venue) results.push(proposal(evidence, "venue", venue, `Venue: ${venue}`, labelledVenue ? 0.97 : navigationVenue ? 0.94 : 0.82, labelledVenue?.[0]?.trim() ?? navigationVenue?.[0]?.trim() ?? venue));
 

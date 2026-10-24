@@ -1,0 +1,27 @@
+.display { display:grid; gap:32px; font-variant-numeric:tabular-nums; padding-bottom:24px; }
+.primary,.secondary { min-width:0; }
+.clock { display:block; font-size:clamp(76px,17vw,148px); font-weight:500; letter-spacing:-.065em; line-height:1.05; }
+.local,.identity p,.current>p,.note { color:var(--text-secondary); }
+.local { font-size:12px; margin:8px 0 24px; }
+.identity h1 { font-size:20px; font-weight:500; margin:0; }
+.identity p { margin:4px 0 0; }
+.current { margin-top:32px; }
+.label { font-size:13px; font-weight:500; color:var(--text-secondary); letter-spacing:.06em; margin:0 0 12px; }
+.current h2 { font-size:clamp(30px,6vw,60px); line-height:1.1; letter-spacing:-.025em; margin:0 0 16px; }
+.current .remaining { color:var(--text-primary); font-size:28px; margin:8px 0; }
+.current .warning,.warning { color:var(--warning); }
+.secondary { display:grid; align-content:start; gap:24px; }
+.milestones { padding:0; margin:0; list-style:none; }
+.milestones li { display:grid; grid-template-columns:4.5em minmax(0,1fr); gap:16px; padding:16px 0; border-bottom:1px solid var(--line-subtle); font-size:20px; }
+.milestones time { color:var(--text-secondary); }
+.projection { display:grid; gap:4px; color:var(--text-secondary); margin:0; }
+.projection strong,.deadline>strong { font-size:28px; color:var(--text-primary); font-weight:500; }
+.deadline { border-left:2px solid var(--line-strong); padding-left:16px; }
+.note { font-size:12px; max-width:44ch; margin:0; }
+@media(min-width:600px) { .display { padding:24px 8px; gap:48px; } .identity h1 { font-size:26px; } .current { margin-top:48px; } .secondary { max-width:650px; } }
+@media(min-width:1000px) and (orientation:landscape) { .display { grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr); gap:48px; align-items:start; } .secondary { padding-top:32px; } }
+
+.reviewNav { display:flex; gap:16px; overflow-x:auto; margin-bottom:24px; }
+.reviewNav a { display:inline-flex; align-items:center; flex-shrink:0; min-height:44px; white-space:nowrap; }
+
+:global(body):has(.display) { min-width:0; }

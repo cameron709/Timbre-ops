@@ -23,7 +23,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       venue: job.venue,
       startDate: job.start_date ?? job.start_at ?? job.event_date,
       clientName: client?.name,
-      contactEmails: [job.contact_email, client?.email, ...clientContacts.map((contact) => contact.email)].filter(Boolean) as string[]
+      contactEmails: [job.contact_email, client?.email, ...clientContacts.map((contact) => contact.email)].filter(Boolean) as string[],
+      primaryContact: job.contact_name || job.contact_email ? {
+        name: job.contact_name,
+        email: job.contact_email,
+        phone: job.site_notes && typeof job.site_notes === "object" && !Array.isArray(job.site_notes) && typeof job.site_notes.on_day_phone === "string" ? job.site_notes.on_day_phone : null
+      } : null
     };
 
     const { token } = await gmailAccessToken(supabase);

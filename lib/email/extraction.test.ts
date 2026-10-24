@@ -17,3 +17,26 @@ describe("email extraction",()=>{
   it("extracts booked Muster backline from natural language",()=>{const proposals=extractProposals({...evidence,body:"We confirmed that we need the drum kit and 2 x amps for the Muster."}).filter(x=>x.fieldKey==="pack_item");expect(proposals.some(x=>JSON.stringify(x.value)===JSON.stringify({name:"Drum kit",quantity:1}))).toBe(true);expect(proposals.some(x=>JSON.stringify(x.value)===JSON.stringify({name:"amps",quantity:2}))).toBe(true);});
 
 });
+
+
+it("extracts Muster navigation, address, reception and specific backline",()=>{
+  const proposals=extractProposals({
+    threadId:"mt",
+    messageId:"mt1",
+    sentAt:"2026-10-14T06:11:52Z",
+    subject:"AFGRI Mountain Country Music Muster 29 October to 1st November",
+    body:"Navigate to \"Mt Trio Bush Camp & Caravan Park\", 4850 Salt River Rd, Amelup WA. Do not travel via Cranbrook. From Albany Highway after Arthur River: Woodanilling turnoff, Katanning, Broomehill, Gnowangerup, then Salt River Rd. Property is 2 km from the Salt River Rd turnoff. Reception can be patchy; Telstra works at the site.",
+    from:"Margot Byrne <mt.trio13@gmail.com>",
+    knownContact:true
+  });
+  expect(proposals.find(x=>x.fieldKey==="venue")?.value).toBe("Mt Trio Bush Camp & Caravan Park");
+  expect(proposals.find(x=>x.fieldKey==="site_note"&&(x.value as {key?:string}).key==="address")?.text).toContain("4850 Salt River Rd");
+  expect(proposals.find(x=>x.fieldKey==="site_note"&&(x.value as {key?:string}).key==="access")?.text).toContain("Cranbrook");
+  expect(proposals.find(x=>x.fieldKey==="site_note"&&(x.value as {key?:string}).key==="reception")?.text).toContain("Telstra");
+});
+
+it("extracts one guitar amp and one bass amp from prose",()=>{
+  const proposals=extractProposals({threadId:"mt",messageId:"mt2",sentAt:"2026-06-29T05:46:39Z",subject:"Re: Mt Trio Country Music Muster Quote",body:"The required backline is the drum kit, one guitar amp and one bass amp."}).filter(x=>x.fieldKey==="pack_item");
+  expect(proposals.some(x=>JSON.stringify(x.value)===JSON.stringify({name:"Guitar amp",quantity:1}))).toBe(true);
+  expect(proposals.some(x=>JSON.stringify(x.value)===JSON.stringify({name:"Bass amp",quantity:1}))).toBe(true);
+});

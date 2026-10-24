@@ -66,9 +66,14 @@ function externalContact(evidence: Evidence, cleanText: string) {
   const email = evidence.from.match(/[\w.+-]+@[\w.-]+/)?.[0]?.toLowerCase();
   if (!email || /@timbrepa\.com\.au$|@billcue\.com\.au$/i.test(email)) return null;
   const displayName = evidence.from.replace(/<[^>]+>/g, "").replace(/^['\"]|['\"]$/g, "").trim();
-  const phone = cleanText.match(/\b0\d{3}\s?\d{3}\s?\d{3}\b/)?.[0]?.replace(/\s+/g, " ");
+  const phoneRegex=/\b0\d{3}\s?\d{3}\s?\d{3}\b/g;
+  const phones=[...cleanText.matchAll(phoneRegex)].map(match=>match[0].replace(/\s+/g," "));
+  const firstName=displayName.split(/\s+/)[0]?.toLowerCase();
+  const namedLine=firstName?cleanText.split("\n").find(line=>line.toLowerCase().includes(firstName)&&/\b0\d{3}\s?\d{3}\s?\d{3}\b/.test(line)):undefined;
+  const namedPhone=namedLine?.match(/\b0\d{3}\s?\d{3}\s?\d{3}\b/)?.[0]?.replace(/\s+/g," ");
+  const phone=namedPhone??(phones.length===1?phones[0]:undefined);
   if (!displayName && !email) return null;
-  return { name: displayName || email, email, phone: phone ?? undefined };
+  return { name: displayName || email, email, phone };
 }
 
 function quotePackProposals(evidence: Evidence, cleanText: string) {
@@ -160,16 +165,37 @@ export function extractProposals(evidence: Evidence): ExtractedProposal[] {
     }
   }
 
+  const dateText=`${evidence.subject}\n${text}`;
+  const dateRange=dateText.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s*(?:-|–|—|to)\s*(\d{1,2})(?:st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December)(?:\s+(20\d{2}))?/i);
+  if(dateRange){
+    const startIndex=dateRange.index??0;
+    const nearby=dateText.slice(Math.max(0,startIndex-140),startIndex+dateRange[0].length+30);
+    const nearbyYear=nearby.match(/\b(20\d{2})\b/)?.[1];
+    const sourceYear=evidence.sentAt?String(new Date(evidence.sentAt).getUTCFullYear()):undefined;
+    const year=dateRange[5]??nearbyYear??sourceYear;
+    if(year){
+      const startDate=`${year}-${months[dateRange[2].toLowerCase()]}-${dateRange[1].padStart(2,"0")}`;
+      const endYear=Number(months[dateRange[4].toLowerCase()])<Number(months[dateRange[2].toLowerCase()])?String(Number(year)+1):year;
+      const endDate=`${endYear}-${months[dateRange[4].toLowerCase()]}-${dateRange[3].padStart(2,"0")}`;
+      const confidence=dateRange[5]||nearbyYear?0.96:0.88;
+      results.push(proposal(evidence,"start_date",{date:startDate},`Event date: ${startDate}`,confidence,dateRange[0],"schedule:start_date"));
+      results.push(proposal(evidence,"end_date",{date:endDate},`Event end date: ${endDate}`,confidence,dateRange[0],"schedule:end_date"));
+    }
+  }
+
   const labelledDate = cleanText.match(new RegExp(`(?:^|\\n)\\s*(?:event\\s*)?date\\s*:\\s*${datePattern}`, "im"));
   const contextualDate = labelledDate ?? text.match(new RegExp(`(?:event|function|awards?|show|dinner)[^.!?]{0,55}?(?:on|for|date\\s*:?)[^.!?]{0,20}?${datePattern}`, "i"));
   if (contextualDate) {
     const date = dateFromMatch(contextualDate);
-    results.push(proposal(evidence, "start_date", { date }, `Event date: ${date}`, 0.97, contextualDate[0].trim(), "schedule:start_date"));
+    if(!results.some(item=>item.fieldKey==="start_date"&&JSON.stringify(item.value)===JSON.stringify({date}))){
+      results.push(proposal(evidence, "start_date", { date }, `Event date: ${date}`, 0.97, contextualDate[0].trim(), "schedule:start_date"));
+    }
   }
 
   const labelledVenue = cleanText.match(/(?:^|\n)\s*(?:location|venue)\s*:\s*([^\n\r]{3,100})/im);
-  const venue = labelledVenue?.[1]?.trim() ?? text.match(/\b(?:held |happening )?at\s+([A-Z][A-Za-z0-9 '&.-]{3,60}?)(?=\s*(?:[,.]|on\s+(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|from\s+\d|$))/)?.[1]?.trim();
-  if (venue) results.push(proposal(evidence, "venue", venue, `Venue: ${venue}`, labelledVenue ? 0.97 : 0.82, labelledVenue?.[0]?.trim() ?? venue));
+  const navigationVenue=cleanText.match(/(?:just\s+)?put in\s+["“]?([^"”\n\r]{3,100})["”]?/i);
+  const venue = labelledVenue?.[1]?.trim() ?? navigationVenue?.[1]?.trim() ?? text.match(/\b(?:held |happening )?at\s+([A-Z][A-Za-z0-9 '&.-]{3,60}?)(?=\s*(?:[,.]|on\s+(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|from\s+\d|$))/)?.[1]?.trim();
+  if (venue) results.push(proposal(evidence, "venue", venue, `Venue: ${venue}`, labelledVenue ? 0.97 : navigationVenue ? 0.94 : 0.82, labelledVenue?.[0]?.trim() ?? navigationVenue?.[0]?.trim() ?? venue));
 
   const contact = externalContact(evidence, cleanText);
   if (contact) {
@@ -231,6 +257,13 @@ export function extractProposals(evidence: Evidence): ExtractedProposal[] {
     ));
   }
 
+  if(!evidence.filename){
+    const directions=cleanText.match(/(?:^|\n)\s*DIRECTIONS:\s*\n?([\s\S]{20,1800}?)(?=\n\s*(?:Margot(?:\s+and\s+John)?\s+Byrne|Regards|Cheers)\b|$)/i);
+    if(directions){
+      results.push(proposal(evidence,"site_note",{key:"access",text:directions[1].trim()},`Access: ${directions[1].trim()}`,0.92,directions[0].trim()));
+    }
+  }
+
   if (!["quote", "invoice"].includes(documentType ?? "")) {
     const siteRules: Array<[string, RegExp, string]> = [
       ["access", /(?:access|parking|loading|entry)[^.!?]{4,180}[.!?]?/i, "Access"],
@@ -240,14 +273,18 @@ export function extractProposals(evidence: Evidence): ExtractedProposal[] {
     ];
     for (const [keyName, regex, label] of siteRules) {
       const match = text.match(regex);
-      if (match) results.push(proposal(evidence, "site_note", { key: keyName, text: match[0].trim() }, `${label}: ${match[0].trim()}`, 0.78, match[0]));
+      if (match && !results.some(item=>item.fieldKey==="site_note"&&typeof item.value==="object"&&item.value&&"key" in item.value&&(item.value as {key?:string}).key===keyName)) results.push(proposal(evidence, "site_note", { key: keyName, text: match[0].trim() }, `${label}: ${match[0].trim()}`, 0.78, match[0]));
     }
 
-    const equipment = /\b(\d+)\s*[x×]?\s+(wireless\s+)?(DI(?: boxes?)?|microphones?|mics?|guitars?|speakers?|monitors?)\b/gi;
+    const equipment = /\b(\d+)\s*[x×]?\s+(wireless\s+)?(DI(?: boxes?)?|microphones?|mics?|guitars?|speakers?|monitors?|amps?|drum\s*kits?|keyboards?|banjos?)\b/gi;
     for (const match of text.matchAll(equipment)) {
       const quantity = Number(match[1]);
       const name = `${match[2] ?? ""}${match[3]}`.trim();
       results.push(proposal(evidence, "pack_item", { name, quantity }, `${quantity} × ${name}`, 0.8, match[0]));
+    }
+    const drumKit=text.match(/\b(?:need|require|booked|confirmed)[^.!?]{0,90}\bdrum\s*kit\b/i);
+    if(drumKit&&!results.some(item=>item.fieldKey==="pack_item"&&typeof item.value==="object"&&item.value&&"name" in item.value&&/drum\s*kit/i.test(String((item.value as {name?:unknown}).name)))){
+      results.push(proposal(evidence,"pack_item",{name:"Drum kit",quantity:1},"1 × Drum kit",0.86,drumKit[0]));
     }
   }
 

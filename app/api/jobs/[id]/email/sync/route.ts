@@ -92,7 +92,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         }
 
         for (const attachment of message.attachments) {
-          if (attachment.gmailAttachmentId && (/pdf|wordprocessingml|text\//i.test(attachment.mimeType ?? "") || /\.(pdf|docx|txt)$/i.test(attachment.filename))) {
+          if (attachment.gmailAttachmentId && (/pdf|wordprocessingml|spreadsheetml|text\//i.test(attachment.mimeType ?? "") || /\.(pdf|docx|xlsx|txt)$/i.test(attachment.filename))) {
             try {
               const download = await gmailFetch<{ data: string }>(token, `/messages/${message.id}/attachments/${attachment.gmailAttachmentId}`);
               const bytes = Buffer.from(download.data.replace(/-/g, "+").replace(/_/g, "/"), "base64");

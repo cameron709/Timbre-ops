@@ -1,4 +1,4 @@
-export type MatchJob = { title: string; venue?: string | null; startDate?: string | null; clientName?: string | null; contactEmails?: string[] };
+export type MatchJob = { title: string; venue?: string | null; startDate?: string | null; clientName?: string | null; contactEmails?: string[]; primaryContact?: { name?: string | null; email?: string | null; phone?: string | null } | null };
 export type MatchThread = { subject: string; snippet?: string | null; participants: string[]; messageDates: string[] };
 export type MatchResult = { score: number; reasons: string[]; eligible: boolean };
 

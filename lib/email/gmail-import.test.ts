@@ -79,3 +79,42 @@ it("still promotes the known organiser as the primary contact",()=>{
   const contact=proposalsForNormalizedThread(normal).find(item=>item.fieldKey==="contact");
   expect(contact?.value).toMatchObject({name:"Margot Byrne",email:"mt.trio13@gmail.com",phone:"0419 751 801"});
 });
+
+
+it("suppresses a contact proposal when the job already knows the same contact details",()=>{
+  const thread:GmailThread={id:"t4",messages:[{
+    id:"organiser-known",
+    threadId:"t4",
+    internalDate:String(new Date("2026-10-12T08:35:30Z").getTime()),
+    snippet:"Current organiser contacts",
+    payload:{
+      headers:[
+        {name:"From",value:"Margot Byrne <mt.trio13@gmail.com>"},
+        {name:"To",value:"cameron@timbrepa.com.au"},
+        {name:"Subject",value:"2026 AFGRI Mountain Country Music Muster"}
+      ],
+      parts:[{mimeType:"text/plain",body:{data:b64("Margot 0419 751 801")}}]
+    }
+  }]};
+  const normal=normalizeGmailThread(thread,{title:"Mt Trio Muster",startDate:"2026-10-29",clientName:"Mt Trio Bush Camp & Caravan Park",contactEmails:["mt.trio13@gmail.com"],primaryContact:{name:"Margot Byrne",email:"mt.trio13@gmail.com",phone:"0419 751 801"}});
+  expect(proposalsForNormalizedThread(normal).some(item=>item.fieldKey==="contact")).toBe(false);
+});
+
+it("keeps a contact proposal when it carries a changed phone number",()=>{
+  const thread:GmailThread={id:"t5",messages:[{
+    id:"organiser-correction",
+    threadId:"t5",
+    internalDate:String(new Date("2026-10-12T08:35:30Z").getTime()),
+    snippet:"Contact correction",
+    payload:{
+      headers:[
+        {name:"From",value:"Margot Byrne <mt.trio13@gmail.com>"},
+        {name:"To",value:"cameron@timbrepa.com.au"},
+        {name:"Subject",value:"2026 AFGRI Mountain Country Music Muster"}
+      ],
+      parts:[{mimeType:"text/plain",body:{data:b64("Margot 0419 751 999")}}]
+    }
+  }]};
+  const normal=normalizeGmailThread(thread,{title:"Mt Trio Muster",startDate:"2026-10-29",clientName:"Mt Trio Bush Camp & Caravan Park",contactEmails:["mt.trio13@gmail.com"],primaryContact:{name:"Margot Byrne",email:"mt.trio13@gmail.com",phone:"0419 751 801"}});
+  expect(proposalsForNormalizedThread(normal).find(item=>item.fieldKey==="contact")?.value).toMatchObject({phone:"0419 751 999"});
+});

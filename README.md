@@ -34,16 +34,17 @@ GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3000/api/integrations/gmail/callback
 GMAIL_TOKEN_ENCRYPTION_KEY=base64_encoded_32_byte_key
 ```
 
-Set both variables in local `.env.local` and in Vercel for Production, Preview, and Development. Never expose a Supabase service-role key in this app.
+Set all required variables in local `.env.local` and in Netlify environment variables. Only the `NEXT_PUBLIC_` variables are browser-visible; Google credentials and the Gmail encryption key must remain server-side. Never expose a Supabase service-role key in this app.
 
 ## External Configuration
 
-- Supabase Auth Site URL: `https://timbre-ops.vercel.app`
-- Supabase redirect allow-list: `https://timbre-ops.vercel.app/auth/callback`
+- Production host: `https://timbre-ops.netlify.app`
+- Supabase Auth Site URL: `https://timbre-ops.netlify.app`
+- Supabase redirect allow-list: `https://timbre-ops.netlify.app/auth/callback`
 - Add team access through `team_members`; RLS requires membership and must remain enabled.
 - Enable leaked-password protection in the Supabase Auth dashboard when the project plan supports it.
 - Create a Google OAuth web client with the Gmail read-only scope and add `/api/integrations/gmail/callback` for each local, preview, and production origin.
-- Set a separate `GOOGLE_OAUTH_REDIRECT_URI` for each Vercel environment. The value must exactly match an authorised Google redirect URI.
+- Set `GOOGLE_OAUTH_REDIRECT_URI=https://timbre-ops.netlify.app/api/integrations/gmail/callback` for production. The value must exactly match an authorised Google redirect URI. Keep Gmail credentials out of branch previews unless a stable preview callback is explicitly configured.
 - Generate `GMAIL_TOKEN_ENCRYPTION_KEY` with `openssl rand -base64 32`. It is server-only and encrypts Gmail tokens at rest.
 - Apply `supabase/migrations/20260928152732_gmail_import_review.sql` only after reviewing its date-only cleanup and email-review tables.
 - Google Calendar credentials are not used; Google Calendar remains unconnected.
@@ -61,3 +62,21 @@ npm run build
 ```
 
 Database changes live in `supabase/migrations/`. The `job-files` Storage bucket is private and protected by team-member policies.
+
+
+## Netlify Deployment
+
+Timbre Ops is hosted on Netlify Free at `https://timbre-ops.netlify.app`.
+
+The committed `netlify.toml` uses:
+
+- build command: `npm run build`
+- publish directory: `.next`
+- Node.js 24
+- Netlify's current OpenNext adapter for Next.js
+
+Production should deploy from `main`. Feature branches such as `codex/visual-refresh-black-aluminium` should be reviewed as branch/deploy previews before merging to production.
+
+For production OAuth, keep the exact callback configured in both Netlify and Google Cloud:
+
+`https://timbre-ops.netlify.app/api/integrations/gmail/callback`

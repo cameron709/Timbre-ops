@@ -258,9 +258,19 @@ export function extractProposals(evidence: Evidence): ExtractedProposal[] {
   }
 
   if(!evidence.filename){
-    const directions=cleanText.match(/(?:^|\n)\s*DIRECTIONS:\s*\n?([\s\S]{20,1800}?)(?=\n\s*(?:Margot(?:\s+and\s+John)?\s+Byrne|Regards|Cheers)\b|$)/i);
+    const directions=cleanText.match(/(?:^|\n)\s*DIRECTIONS:\s*\n?([\s\S]{20,1800}?)(?=\n\s*(?:Margot(?:\s+and\s+John)?\s+Byrne|Regards|Cheers)\b|$)/i)
+      ?? cleanText.match(/((?:Do not (?:travel|route)[\s\S]{20,900}?)(?=(?:Reception|Regards|Cheers|$)))/i);
     if(directions){
-      results.push(proposal(evidence,"site_note",{key:"access",text:directions[1].trim()},`Access: ${directions[1].trim()}`,0.92,directions[0].trim()));
+      const access=(directions[1]??directions[0]).trim();
+      results.push(proposal(evidence,"site_note",{key:"access",text:access},`Access: ${access}`,0.92,directions[0].trim()));
+    }
+    const addressMatch=cleanText.match(/\b(\d{1,5}\s+[A-Za-z0-9 '&.-]+\s+(?:Road|Rd|Street|St|Drive|Dr|Way|Highway|Hwy),?\s*[A-Za-z][A-Za-z ]*(?:\s+WA)?(?:\s+\d{4})?)\b/i);
+    if(addressMatch){
+      results.push(proposal(evidence,"site_note",{key:"address",text:addressMatch[1].trim()},`Address: ${addressMatch[1].trim()}`,0.95,addressMatch[0]));
+    }
+    const reception=cleanText.match(/(?:reception|mobile reception|phone reception)[^.!?]{0,180}(?:[.!?]|$)/i);
+    if(reception){
+      results.push(proposal(evidence,"site_note",{key:"reception",text:reception[0].trim()},`Reception: ${reception[0].trim()}`,0.9,reception[0]));
     }
   }
 
@@ -285,6 +295,15 @@ export function extractProposals(evidence: Evidence): ExtractedProposal[] {
     const drumKit=text.match(/\b(?:need|require|booked|confirmed)[^.!?]{0,90}\bdrum\s*kit\b/i);
     if(drumKit&&!results.some(item=>item.fieldKey==="pack_item"&&typeof item.value==="object"&&item.value&&"name" in item.value&&/drum\s*kit/i.test(String((item.value as {name?:unknown}).name)))){
       results.push(proposal(evidence,"pack_item",{name:"Drum kit",quantity:1},"1 × Drum kit",0.86,drumKit[0]));
+    }
+    const wordQuantity:Record<string,number>={one:1,two:2,three:3,four:4};
+    for(const match of text.matchAll(/\b(one|two|three|four)\s+(guitar\s+amp|bass\s+amp|keyboard|banjo)\b/gi)){
+      const quantity=wordQuantity[match[1].toLowerCase()];
+      const rawName=match[2].toLowerCase();
+      const name=rawName==="guitar amp"?"Guitar amp":rawName==="bass amp"?"Bass amp":rawName==="keyboard"?"Keyboard":"Banjo";
+      if(!results.some(item=>item.fieldKey==="pack_item"&&typeof item.value==="object"&&item.value&&"name" in item.value&&String((item.value as {name?:unknown}).name).toLowerCase()===name.toLowerCase())){
+        results.push(proposal(evidence,"pack_item",{name,quantity},`${quantity} × ${name}`,0.9,match[0]));
+      }
     }
   }
 

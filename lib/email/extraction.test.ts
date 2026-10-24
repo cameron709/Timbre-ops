@@ -40,3 +40,20 @@ it("extracts one guitar amp and one bass amp from prose",()=>{
   expect(proposals.some(x=>JSON.stringify(x.value)===JSON.stringify({name:"Guitar amp",quantity:1}))).toBe(true);
   expect(proposals.some(x=>JSON.stringify(x.value)===JSON.stringify({name:"Bass amp",quantity:1}))).toBe(true);
 });
+
+
+it("does not treat attendee generator rules as production power",()=>{
+  const proposals=extractProposals({
+    threadId:"mt",
+    messageId:"activities",
+    sentAt:"2026-10-12T08:35:30Z",
+    subject:"2026 AFGRI Mountain Country Music Muster",
+    body:"Generators may only operate 8.00–10.00am and 5.00–7.00pm each day – just enough time to top up your batteries.",
+    filename:"Mountain Country Music Muster Event Activities.pdf",
+    mimeType:"application/pdf",
+    attachmentId:"activities-pdf"
+  });
+  expect(proposals.some(item=>item.fieldKey==="site_note")).toBe(false);
+  expect(proposals.some(item=>item.fieldKey==="pack_item")).toBe(false);
+  expect(proposals.some(item=>item.fieldKey==="document")).toBe(true);
+});

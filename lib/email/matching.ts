@@ -9,18 +9,45 @@ const overlap = (a: string, b: string) => {
 };
 const DAY = 86400000;
 const PLANNING_WINDOW_DAYS = 300;
+const GENERIC_SINGLE_TITLE_WORDS = new Set(["event","show","festival","awards","award","music","party","concert","gala","function"]);
 
 export function scoreThreadMatch(job: MatchJob, thread: MatchThread): MatchResult {
   const haystack = `${thread.subject} ${thread.snippet ?? ""}`;
   const reasons: string[] = [];
   let score = 0;
+
   const titleWords = overlap(job.title, haystack);
-  if (titleWords.length >= 2) { score += Math.min(45, 20 + titleWords.length * 5); reasons.push(`event name: ${titleWords.join(", ")}`); }
-  if (job.clientName && overlap(job.clientName, haystack).length) { score += 20; reasons.push(`client: ${job.clientName}`); }
-  if (job.venue && overlap(job.venue, haystack).length) { score += 15; reasons.push(`venue: ${job.venue}`); }
+  if (titleWords.length >= 2) {
+    score += Math.min(45, 20 + titleWords.length * 5);
+    reasons.push(`event name: ${titleWords.join(", ")}`);
+  } else if (titleWords.length === 1 && !GENERIC_SINGLE_TITLE_WORDS.has(titleWords[0])) {
+    score += 15;
+    reasons.push(`event keyword: ${titleWords[0]}`);
+  }
+
+  if (job.clientName && overlap(job.clientName, haystack).length) {
+    score += 20;
+    reasons.push(`client: ${job.clientName}`);
+  }
+  if (job.venue && overlap(job.venue, haystack).length) {
+    score += 15;
+    reasons.push(`venue: ${job.venue}`);
+  }
+
   const participantText = thread.participants.join(" ").toLowerCase();
   const matchedEmail = job.contactEmails?.find((email) => participantText.includes(email.toLowerCase()));
-  if (matchedEmail) { score += 25; reasons.push(`contact: ${matchedEmail}`); }
+  if (matchedEmail) {
+    score += 25;
+    reasons.push(`contact: ${matchedEmail}`);
+  }
+
+  const participantIdentity = thread.participants.join(" ").replace(/\d+/g, " ");
+  const participantTitleWords = overlap(job.title, participantIdentity)
+    .filter((word) => !GENERIC_SINGLE_TITLE_WORDS.has(word));
+  if (!matchedEmail && participantTitleWords.length) {
+    score += Math.min(25, 15 + participantTitleWords.length * 5);
+    reasons.push(`participant identity: ${participantTitleWords.join(", ")}`);
+  }
 
   let outsidePlanningWindow = false;
   if (job.startDate && thread.messageDates.length) {
@@ -30,8 +57,14 @@ export function scoreThreadMatch(job: MatchJob, thread: MatchThread): MatchResul
       .filter(Number.isFinite);
     if (deltas.length) {
       const closestDays = Math.min(...deltas) / DAY;
-      if (closestDays <= 120) { score += 10; reasons.push("message date near event"); }
-      if (closestDays > PLANNING_WINDOW_DAYS) { outsidePlanningWindow = true; reasons.push("historical thread outside planning window"); }
+      if (closestDays <= 120) {
+        score += 10;
+        reasons.push("message date near event");
+      }
+      if (closestDays > PLANNING_WINDOW_DAYS) {
+        outsidePlanningWindow = true;
+        reasons.push("historical thread outside planning window");
+      }
     }
   }
 

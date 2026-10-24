@@ -35,6 +35,8 @@ export type OperationStatus = "open" | "waiting" | "done" | "cancelled";
 export type PackState = "planned" | "packed" | "out" | "returned";
 export type SourceKind = "client" | "cameron" | "beth" | "email" | "calendar" | "ai_inference" | "system";
 export type PackLineType = "catalogue" | "hire" | "consumable" | "purchase" | "custom";
+export type InventoryItemType = "product" | "service" | "consumable" | "hire_in";
+export type InventoryTrackingMode = "pooled" | "serialised" | "non_stock";
 
 export type Client = {
   id: string;
@@ -250,6 +252,9 @@ export type PackItem = {
   gear_item_id: string | null;
   line_type: PackLineType;
   source_context: string | null;
+  booking_id: string | null;
+  package_id: string | null;
+  asset_id: string | null;
 };
 
 export type GearItem = {
@@ -260,6 +265,67 @@ export type GearItem = {
   description: string | null;
   notes: string | null;
   photo_url: string | null;
+  item_type: InventoryItemType;
+  tracking_mode: InventoryTrackingMode;
+  unit: string;
+  active: boolean;
+  sku: string | null;
+  default_rate: number | null;
+  replacement_value: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Asset = {
+  id: string;
+  gear_item_id: string;
+  asset_tag: string;
+  serial_number: string | null;
+  barcode: string | null;
+  status: "available" | "maintenance" | "retired" | "lost";
+  condition: "good" | "fair" | "damaged" | "maintenance";
+  purchase_date: string | null;
+  purchase_price: number | null;
+  test_tag_due: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InventoryPackage = {
+  id: string;
+  name: string;
+  category: string;
+  description: string | null;
+  client_description: string | null;
+  notes: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PackageItem = {
+  id: string;
+  package_id: string;
+  gear_item_id: string | null;
+  child_package_id: string | null;
+  quantity: number;
+  client_visible: boolean;
+  required: boolean;
+  notes: string | null;
+  created_at: string;
+};
+
+export type JobBooking = {
+  id: string;
+  job_id: string;
+  booking_type: "item" | "package";
+  gear_item_id: string | null;
+  package_id: string | null;
+  quantity: number;
+  client_visible: boolean;
+  source: SourceKind;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -385,6 +451,10 @@ export type Database = {
         Relationships: [];
       };
       gear_items: { Row: GearItem; Insert: Partial<GearItem> & Pick<GearItem, "name">; Update: Partial<GearItem>; Relationships: []; };
+      assets: { Row: Asset; Insert: Partial<Asset> & Pick<Asset, "gear_item_id" | "asset_tag">; Update: Partial<Asset>; Relationships: []; };
+      packages: { Row: InventoryPackage; Insert: Partial<InventoryPackage> & Pick<InventoryPackage, "name">; Update: Partial<InventoryPackage>; Relationships: []; };
+      package_items: { Row: PackageItem; Insert: Partial<PackageItem> & Pick<PackageItem, "package_id" | "quantity">; Update: Partial<PackageItem>; Relationships: []; };
+      job_bookings: { Row: JobBooking; Insert: Partial<JobBooking> & Pick<JobBooking, "job_id" | "booking_type" | "quantity">; Update: Partial<JobBooking>; Relationships: []; };
       gear_kits: { Row: GearKit; Insert: Partial<GearKit> & Pick<GearKit, "name">; Update: Partial<GearKit>; Relationships: []; };
       gear_kit_items: { Row: GearKitItem; Insert: Partial<GearKitItem> & Pick<GearKitItem, "kit_id" | "gear_item_id" | "quantity">; Update: Partial<GearKitItem>; Relationships: []; };
       external_links: {

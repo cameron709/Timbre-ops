@@ -144,9 +144,8 @@ export function parseDueDate(phrase: string, now = new Date()) {
 }
 
 function atBusinessHour(date: Date) {
-  const next = new Date(date);
-  next.setHours(9, 0, 0, 0);
-  return next.toISOString();
+  const perthDate = dateInPerth(date.toISOString());
+  return new Date(`${perthDate}T09:00:00+08:00`).toISOString();
 }
 
 function normalizeItemHint(item: string) {

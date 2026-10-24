@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PackagePlus, Trash2 } from "lucide-react";
 import { Pill } from "@/components/ui";
-import { expandPackage, fulfilmentForItem } from "@/lib/inventory";
+import { bookingAvailability, expandPackage, fulfilmentForItem } from "@/lib/inventory";
 import { statusLabel } from "@/lib/format";
 import { createBrowserClient } from "@/lib/supabase/client";
-import type { GearItem, InventoryPackage, JobBooking, PackageItem, PackItem } from "@/types/database";
+import type { GearItem, InventoryPackage, Job, JobBooking, PackageItem, PackItem } from "@/types/database";
 
 export function ProjectEquipment({ jobId, onChanged }: { jobId: string; onChanged?: () => Promise<void> | void }) {
   const supabase = useMemo(() => createBrowserClient(), []);
@@ -14,27 +14,52 @@ export function ProjectEquipment({ jobId, onChanged }: { jobId: string; onChange
   const [packages, setPackages] = useState<InventoryPackage[]>([]);
   const [packageItems, setPackageItems] = useState<PackageItem[]>([]);
   const [bookings, setBookings] = useState<JobBooking[]>([]);
-  const [pack, setPack] = useState<PackItem[]>([]);
+  const [allPack, setAllPack] = useState<PackItem[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [selection, setSelection] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
-    const [a, b, c, d, e] = await Promise.all([
+    const [a, b, c, d, e, f] = await Promise.all([
       supabase.from("gear_items").select("*").eq("active", true).order("category").order("name"),
       supabase.from("packages").select("*").eq("active", true).order("name"),
       supabase.from("package_items").select("*"),
       supabase.from("job_bookings").select("*").eq("job_id", jobId).order("created_at"),
-      supabase.from("pack_items").select("*").eq("job_id", jobId)
+      supabase.from("pack_items").select("*"),
+      supabase.from("jobs").select("*")
     ]);
     setGear(a.data ?? []);
     setPackages(b.data ?? []);
     setPackageItems(c.data ?? []);
     setBookings(d.data ?? []);
-    setPack(e.data ?? []);
+    setAllPack(e.data ?? []);
+    setJobs(f.data ?? []);
   }, [jobId, supabase]);
 
   useEffect(() => { load(); }, [load]);
+
+  const pack = allPack.filter((line) => line.job_id === jobId);
+  const targetJob = jobs.find((job) => job.id === jobId);
+  const selectionPreview = useMemo(() => {
+    if (!selection) return { drafts: [], error: null as string | null };
+    const [kind, selectedId] = selection.split(":");
+    const count = Math.max(1, Number(quantity) || 1);
+    const item = kind === "item" ? gear.find((entry) => entry.id === selectedId) : null;
+    const packageRecord = kind === "package" ? packages.find((entry) => entry.id === selectedId) : null;
+    try {
+      return {
+        drafts: item ? fulfilmentForItem(item, count) : packageRecord ? expandPackage(packageRecord.id, count, packages, packageItems, gear) : [],
+        error: null as string | null
+      };
+    } catch (error) {
+      return { drafts: [], error: error instanceof Error ? error.message : "Could not expand this package." };
+    }
+  }, [selection, quantity, gear, packages, packageItems]);
+  const availability = useMemo(
+    () => bookingAvailability(targetJob, selectionPreview.drafts, gear, allPack, jobs),
+    [targetJob, selectionPreview.drafts, gear, allPack, jobs]
+  );
 
   async function addBooking() {
     if (!selection) return;
@@ -44,6 +69,17 @@ export function ProjectEquipment({ jobId, onChanged }: { jobId: string; onChange
     const item = bookingType === "item" ? gear.find((entry) => entry.id === selectedId) : null;
     const packageRecord = bookingType === "package" ? packages.find((entry) => entry.id === selectedId) : null;
     if (!item && !packageRecord) return;
+    if (selectionPreview.error) {
+      setNotice(selectionPreview.error);
+      return;
+    }
+    if (availability.unknownDate && selectionPreview.drafts.length) {
+      if (!window.confirm("This project has no confirmed date, so stock conflicts with other projects cannot be checked. Book it anyway?")) return;
+    }
+    if (availability.conflicts.length) {
+      const summary = availability.conflicts.map((conflict) => `${conflict.gearName}: short ${conflict.shortageAfter}`).join("\n");
+      if (!window.confirm(`This booking over-allocates owned stock:\n\n${summary}\n\nBook it anyway?`)) return;
+    }
 
     const inserted = await supabase.from("job_bookings").insert({
       job_id: jobId,
@@ -61,9 +97,7 @@ export function ProjectEquipment({ jobId, onChanged }: { jobId: string; onChange
     }
 
     try {
-      const drafts = item
-        ? fulfilmentForItem(item, count)
-        : expandPackage(packageRecord!.id, count, packages, packageItems, gear);
+      const drafts = selectionPreview.drafts;
 
       if (drafts.length) {
         const fulfilment = await supabase.from("pack_items").insert(drafts.map((draft) => ({
@@ -130,6 +164,13 @@ export function ProjectEquipment({ jobId, onChanged }: { jobId: string; onChange
         <input aria-label="Booking quantity" inputMode="numeric" value={quantity} onChange={(event) => setQuantity(event.target.value)} />
         <button className="icon-text-button" onClick={addBooking} type="button"><PackagePlus size={17} /> Book</button>
       </div>
+
+      {selection ? <div className="compact-list">
+        {selectionPreview.error ? <article className="compact-row"><span><strong>Package problem</strong><small>{selectionPreview.error}</small></span><Pill tone="warn">Cannot book</Pill></article> : null}
+        {!selectionPreview.error && availability.unknownDate && selectionPreview.drafts.length ? <article className="compact-row"><span><strong>Availability not verified</strong><small>Set the project date to check this booking against other jobs.</small></span><Pill tone="warn">Date needed</Pill></article> : null}
+        {!selectionPreview.error && !availability.unknownDate && availability.conflicts.map((conflict) => <article className="compact-row" key={conflict.gearItemId}><span><strong>{conflict.gearName}</strong><small>Owned {conflict.quantityOwned} · already required {conflict.existingDemand} · this booking adds {conflict.requested} · {conflict.availableBefore} available before booking{conflict.conflictingProjects.length ? ` · also on ${conflict.conflictingProjects.join(", ")}` : ""}</small></span><Pill tone="warn">Short {conflict.shortageAfter}</Pill></article>)}
+        {!selectionPreview.error && !availability.unknownDate && !availability.conflicts.length && selectionPreview.drafts.length ? <article className="compact-row"><span><strong>Stock check clear</strong><small>No owned-stock conflict detected for this project window.</small></span><Pill tone="good">Available</Pill></article> : null}
+      </div> : null}
 
       <div className="compact-list">
         {bookings.map((booking) => {

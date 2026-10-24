@@ -81,7 +81,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             client_id: job.client_id,
             contact_id: matchedContact?.id ?? job.primary_contact_id ?? null,
             job_id: id,
-            direction: matchedContact ? "inbound" : fromEmail === "cameron@timbrepa.com.au" ? "outbound" : "internal",
+            direction: matchedContact ? "inbound" : fromEmail?.endsWith("@timbrepa.com.au") || fromEmail?.endsWith("@billcue.com.au") ? "outbound" : "inbound",
             subject: message.subject || thread.subject || "(no subject)",
             summary: message.snippet,
             body: message.body,

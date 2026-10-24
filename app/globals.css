@@ -76,8 +76,16 @@ small { line-height: 1.5; }
 /* Shell: integrated phone tabs, progressively revealed tablet sidebar. */
 .app-shell { min-height: 100dvh; padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
 .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left)); background: var(--surface-1); border-bottom: 1px solid var(--line-subtle); }
-.wordmark { font-size: 20px; font-weight: 600; letter-spacing: -.8px; }
-.wordmark strong { color: var(--text-secondary); font-weight: 400; margin-left: 5px; }
+.brand-link { display: inline-flex; align-items: center; min-height: 44px; min-width: 0; }
+.brand-mark { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
+.brand-logo { display: block; width: auto; height: 25px; max-width: 132px; object-fit: contain; object-position: left center; }
+.brand-product { flex-shrink: 0; color: var(--text-tertiary); font-family: var(--font-technical); font-size: 9px; font-weight: 600; letter-spacing: .18em; line-height: 1; }
+.sidebar-brand .brand-logo { height: 29px; max-width: 148px; }
+.sidebar-brand .brand-mark { display: grid; justify-items: start; gap: 7px; }
+.sidebar-brand .brand-product { margin-left: 1px; }
+.auth-brand { display: grid; justify-items: start; gap: 10px; margin-bottom: 28px; }
+.auth-brand .brand-logo { height: 34px; max-width: 190px; }
+.auth-brand .brand-product { font-size: 10px; }
 .shell-caption, .sidebar { display: none; }
 .account-menu { position: relative; }
 .account-menu summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 44px; min-width: 44px; justify-content: center; color: var(--muted); cursor: pointer; border-radius: var(--radius-control); }
@@ -305,8 +313,7 @@ small { line-height: 1.5; }
 .text-button { border: 0; min-height: 44px; background: transparent; color: var(--muted); padding: 8px 0; }
 .center-screen, .auth-screen { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
 .auth-panel { width: min(100%, 420px); background: var(--surface-1); border-radius: var(--radius-panel); padding: 24px; }
-.brand-lock { width: 44px; height: 44px; border-radius: var(--radius-row); display: grid; place-items: center; color: var(--bg); background: var(--accent); }
-.auth-panel h1 { margin: 24px 0 8px; font-weight: 600; }
+.auth-panel h1 { margin: 0 0 8px; font-weight: 600; }
 .auth-panel p { color: var(--muted); }
 .auth-form, .auth-form label { display: grid; gap: 12px; }
 .auth-form { gap: 16px; }
@@ -371,7 +378,7 @@ small { line-height: 1.5; }
 @media (min-width: 900px) {
   .app-shell { padding-left: 192px; padding-bottom: 0; }
   .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 25; display: flex; flex-direction: column; width: 192px; padding: max(28px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom)); background: var(--surface-1); border-right: 1px solid var(--line-subtle); }
-  .sidebar > .wordmark { padding-left: 12px; }
+  .sidebar > .sidebar-brand { padding-left: 12px; margin-bottom: 4px; }
   .sidebar-caption { color: var(--faint); font-size: 11px; margin: 8px 0 32px 12px; }
   .sidebar nav { display: grid; gap: 4px; }
   .sidebar nav a { position: relative; display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 10px 12px; color: var(--muted); border-radius: var(--radius-control); font-size: 14px; }
@@ -380,7 +387,7 @@ small { line-height: 1.5; }
   .sidebar .workspace-nav { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line-subtle); }
   .sidebar-footer { margin-top: auto; padding: 32px 12px 0; display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
   .sidebar-footer small { color: var(--faint); }
-  .bottom-nav, .topbar > .wordmark { display: none; }
+  .bottom-nav, .topbar > .topbar-brand { display: none; }
   .shell-caption { display: block; font-size: 12px; color: var(--faint); }
   .topbar { background: var(--bg); padding-inline: 32px; }
   .content-shell { padding: 40px 32px 64px; }

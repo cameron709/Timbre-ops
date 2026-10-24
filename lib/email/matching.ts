@@ -7,6 +7,8 @@ const overlap = (a: string, b: string) => {
   const right = new Set(words(b));
   return [...new Set(words(a))].filter((word) => right.has(word));
 };
+const DAY = 86400000;
+const PLANNING_WINDOW_DAYS = 300;
 
 export function scoreThreadMatch(job: MatchJob, thread: MatchThread): MatchResult {
   const haystack = `${thread.subject} ${thread.snippet ?? ""}`;
@@ -19,9 +21,20 @@ export function scoreThreadMatch(job: MatchJob, thread: MatchThread): MatchResul
   const participantText = thread.participants.join(" ").toLowerCase();
   const matchedEmail = job.contactEmails?.find((email) => participantText.includes(email.toLowerCase()));
   if (matchedEmail) { score += 25; reasons.push(`contact: ${matchedEmail}`); }
-  if (job.startDate && thread.messageDates.some((date) => Math.abs(new Date(date).getTime() - new Date(job.startDate!).getTime()) < 120 * 86400000)) {
-    score += 10; reasons.push("message date near event");
+
+  let outsidePlanningWindow = false;
+  if (job.startDate && thread.messageDates.length) {
+    const eventTime = new Date(job.startDate).getTime();
+    const deltas = thread.messageDates
+      .map((date) => Math.abs(new Date(date).getTime() - eventTime))
+      .filter(Number.isFinite);
+    if (deltas.length) {
+      const closestDays = Math.min(...deltas) / DAY;
+      if (closestDays <= 120) { score += 10; reasons.push("message date near event"); }
+      if (closestDays > PLANNING_WINDOW_DAYS) { outsidePlanningWindow = true; reasons.push("historical thread outside planning window"); }
+    }
   }
-  const distinctSignals = reasons.filter((reason) => !reason.startsWith("message date")).length;
-  return { score: Math.min(100, score), reasons, eligible: score >= 45 && distinctSignals >= 2 };
+
+  const distinctSignals = reasons.filter((reason) => !reason.startsWith("message date") && !reason.startsWith("historical thread")).length;
+  return { score: Math.min(100, score), reasons, eligible: !outsidePlanningWindow && score >= 45 && distinctSignals >= 2 };
 }

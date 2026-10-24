@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Boxes, PackagePlus, Plus, Search } from "lucide-react";
+import { AlertTriangle, Boxes, PackagePlus, Plus, Search, Trash2 } from "lucide-react";
 import { EmptyState, Pill } from "@/components/ui";
 import { allocationSummary } from "@/lib/gear";
+import { packageWouldCreateCycle } from "@/lib/inventory";
 import { formatJobSchedule, statusLabel } from "@/lib/format";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { Asset, GearItem, InventoryItemType, InventoryPackage, InventoryTrackingMode, Job, PackageItem, PackItem } from "@/types/database";
 
-const categories = ["audio", "power", "staging", "cabling", "playback", "lighting", "comms", "vision", "other"];
 const itemTypes: InventoryItemType[] = ["product", "service", "consumable", "hire_in"];
 const trackingModes: InventoryTrackingMode[] = ["pooled", "serialised", "non_stock"];
 
@@ -24,6 +24,8 @@ export default function GearPage() {
   const [tab, setTab] = useState<"catalogue" | "packages" | "allocations">("catalogue");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
+  const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
+  const [componentQuantityDrafts, setComponentQuantityDrafts] = useState<Record<string, string>>({});
   const [newItem, setNewItem] = useState({ name: "", category: "audio", item_type: "product" as InventoryItemType, tracking_mode: "pooled" as InventoryTrackingMode, quantity_owned: "0", description: "" });
   const [newAsset, setNewAsset] = useState({ gear_item_id: "", asset_tag: "", serial_number: "" });
   const [newPackage, setNewPackage] = useState({ name: "", category: "audio", description: "", client_description: "" });
@@ -52,6 +54,13 @@ export default function GearPage() {
   const warnings = allocations.filter((item) => item.shortage > 0 || item.overlapWarning);
   const gearById = new Map(gear.map((item) => [item.id, item]));
   const packageById = new Map(packages.map((item) => [item.id, item]));
+  const categories = useMemo(() => Array.from(new Set([
+    ...gear.map((item) => item.category),
+    ...packages.map((item) => item.category),
+    newItem.category,
+    newPackage.category,
+    "other"
+  ].filter(Boolean))).sort((a, b) => a.localeCompare(b)), [gear, packages, newItem.category, newPackage.category]);
 
   const matches = (name: string, itemCategory: string) => (!search || name.toLowerCase().includes(search.toLowerCase())) && (category === "all" || itemCategory === category);
   const visibleGear = gear.filter(item => matches(item.name, item.category));
@@ -78,7 +87,20 @@ export default function GearPage() {
   async function updateItem(item: GearItem, patch: Partial<GearItem>) {
     const result = await supabase.from("gear_items").update(patch).eq("id", item.id);
     setNotice(result.error?.message ?? "Catalogue item updated.");
-    load();
+    if (!result.error) await load();
+  }
+
+  async function saveOwnedQuantity(item: GearItem) {
+    const raw = quantityDrafts[item.id];
+    if (raw === undefined) return;
+    const nextQuantity = Math.max(0, Number(raw) || 0);
+    setQuantityDrafts((current) => {
+      const next = { ...current };
+      delete next[item.id];
+      return next;
+    });
+    if (nextQuantity === item.quantity_owned) return;
+    await updateItem(item, { quantity_owned: nextQuantity });
   }
 
   async function addAsset() {
@@ -110,8 +132,8 @@ export default function GearPage() {
     const draft = componentDrafts[packageRecord.id];
     if (!draft?.component) return;
     const [kind, id] = draft.component.split(":");
-    if (kind === "package" && id === packageRecord.id) {
-      setNotice("A package cannot contain itself. Even road cases have boundaries.");
+    if (kind === "package" && packageWouldCreateCycle(packageRecord.id, id, packageItems)) {
+      setNotice("That component would create a circular package. Packages can nest, but they cannot eventually contain themselves.");
       return;
     }
     const result = await supabase.from("package_items").insert({
@@ -123,6 +145,28 @@ export default function GearPage() {
     setNotice(result.error?.message ?? "Package component added.");
     if (!result.error) setComponentDrafts({ ...componentDrafts, [packageRecord.id]: { component: "", quantity: "1" } });
     load();
+  }
+
+  async function updatePackageComponent(component: PackageItem) {
+    const raw = componentQuantityDrafts[component.id];
+    if (raw === undefined) return;
+    const quantity = Math.max(1, Number(raw) || 1);
+    setComponentQuantityDrafts((current) => {
+      const next = { ...current };
+      delete next[component.id];
+      return next;
+    });
+    if (quantity === component.quantity) return;
+    const result = await supabase.from("package_items").update({ quantity }).eq("id", component.id);
+    setNotice(result.error?.message ?? "Package component quantity updated.");
+    if (!result.error) await load();
+  }
+
+  async function removePackageComponent(component: PackageItem, label: string) {
+    if (!window.confirm(`Remove ${label} from this package?`)) return;
+    const result = await supabase.from("package_items").delete().eq("id", component.id);
+    setNotice(result.error?.message ?? `${label} removed from the package.`);
+    if (!result.error) await load();
   }
 
   return (
@@ -170,7 +214,24 @@ export default function GearPage() {
                     {item.item_type === "product" || item.item_type === "consumable" ? <span className="stock-figures"><span>Owned <b>{item.quantity_owned}</b></span><span>Planned <b>{allocation?.planned ?? 0}</b></span><span>Unallocated <b>{Math.max(0, item.quantity_owned - (allocation?.planned ?? 0))}</b></span></span> : <small>Non-stock booking item</small>}
                     {item.description ? <small>{item.description}</small> : null}
                   </div>
-                  {item.item_type === "product" || item.item_type === "consumable" ? <label className="quantity-edit">Owned<input aria-label={`${item.name} quantity owned`} inputMode="numeric" value={item.quantity_owned} onChange={(event) => updateItem(item, { quantity_owned: Math.max(0, Number(event.target.value) || 0) })} /></label> : null}
+                  {item.item_type === "product" || item.item_type === "consumable" ? <label className="quantity-edit">Owned<input
+                    aria-label={`${item.name} quantity owned`}
+                    inputMode="numeric"
+                    value={quantityDrafts[item.id] ?? String(item.quantity_owned)}
+                    onChange={(event) => setQuantityDrafts((current) => ({ ...current, [item.id]: event.target.value }))}
+                    onBlur={() => saveOwnedQuantity(item)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") event.currentTarget.blur();
+                      if (event.key === "Escape") {
+                        setQuantityDrafts((current) => {
+                          const next = { ...current };
+                          delete next[item.id];
+                          return next;
+                        });
+                        event.currentTarget.blur();
+                      }
+                    }}
+                  /></label> : null}
                   {allocation?.shortage ? <Pill tone="warn">Short {allocation.shortage}</Pill> : <Pill tone="quiet">{item.active ? "Active" : "Archived"}</Pill>}
                 </article>
               );
@@ -215,10 +276,22 @@ export default function GearPage() {
                 <div>
                   <strong>{packageRecord.name}</strong>
                   <small>{packageRecord.client_description ?? packageRecord.description ?? "No description"}</small>
-                  <small>{components.length ? components.map((component) => {
+                  {components.length ? <div className="package-component-list">{components.map((component) => {
                     const label = component.gear_item_id ? gearById.get(component.gear_item_id)?.name : packageById.get(component.child_package_id ?? "")?.name;
-                    return `${component.quantity} × ${label ?? "Unknown component"}`;
-                  }).join(", ") : "No components yet"}</small>
+                    const componentLabel = label ?? "Unknown component";
+                    return <div className="kit-component-controls" key={component.id}>
+                      <span>{componentLabel}</span>
+                      <input
+                        aria-label={`Quantity of ${componentLabel} in ${packageRecord.name}`}
+                        inputMode="numeric"
+                        value={componentQuantityDrafts[component.id] ?? String(component.quantity)}
+                        onChange={(event) => setComponentQuantityDrafts((current) => ({ ...current, [component.id]: event.target.value }))}
+                        onBlur={() => updatePackageComponent(component)}
+                        onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+                      />
+                      <button className="secondary-button" type="button" aria-label={`Remove ${componentLabel}`} title={`Remove ${componentLabel}`} onClick={() => removePackageComponent(component, componentLabel)}><Trash2 size={15} /></button>
+                    </div>;
+                  })}</div> : <small>No components yet</small>}
                 </div>
                 <div className="kit-component-controls">
                   <select aria-label={`Component for ${packageRecord.name}`} value={componentDrafts[packageRecord.id]?.component ?? ""} onChange={(event) => setComponentDrafts({ ...componentDrafts, [packageRecord.id]: { component: event.target.value, quantity: componentDrafts[packageRecord.id]?.quantity ?? "1" } })}>

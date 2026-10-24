@@ -7,7 +7,7 @@ import { OnTheDay } from "./on-the-day";
 it("renders sparse identity and clock without empty optional sections", () => {
   const html = renderToStaticMarkup(<OnTheDay title="Sparse event" schedule={{ items: [], warnings: [] }} reviewNow={Date.parse("2026-10-24T12:00:00Z")}/>);
   expect(html).toContain("Sparse event");
-  expect(html).toContain("Device local time");
+  expect(html).toContain("Review time");
   expect(html).toContain("no timed run sheet");
   expect(html).not.toContain("Hard curfew");
   expect(html).not.toContain("Projected programme finish");
@@ -28,4 +28,12 @@ it.each(["next-start", "accumulated", "curfew-delay"] as const)("renders context
     expect(html).toContain("37");
     expect(html).toContain("min beyond deadline");
   } else expect(html).not.toContain("Hard curfew");
+});
+
+it("renders review clock in Perth time regardless of the server timezone", () => {
+  const { schedule, now } = onTheDayReview("next-start");
+  const html = renderToStaticMarkup(<OnTheDay title="Muster" schedule={schedule} reviewNow={now}/>);
+  expect(html).toContain(">20:40</time>");
+  expect(html).toContain("AWST");
+  expect(html).toContain("Review time");
 });

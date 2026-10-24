@@ -2,7 +2,7 @@
 
 Entry: Job workspace → On The Day, `/jobs/[id]/on-the-day`.
 
-Local review: set `NEXT_PUBLIC_ENABLE_REVIEW_FIXTURES=1`, run `npm run dev -- --webpack --port 3010`, open `/review/on-the-day`. Scenarios: `pre`, `active`, `overrun`, `next-start`, `accumulated`, `curfew`, `curfew-delay`, `sparse`, `invalid`, `overnight` via `?scenario=`. Review times are fixed and displayed in the device timezone. Normal job views use the live device clock, resynchronise on focus/visibility and refresh the job every minute. No writes are made.
+Local review: set `NEXT_PUBLIC_ENABLE_REVIEW_FIXTURES=1`, run `npm run dev -- --webpack --port 3010`, open `/review/on-the-day`. Scenarios: `pre`, `active`, `overrun`, `next-start`, `accumulated`, `curfew`, `curfew-delay`, `sparse`, `invalid`, `overnight` via `?scenario=`. Review times are fixed and displayed in Australia/Perth on both server and client to avoid hydration mismatches. Normal job views use the live device clock, resynchronise on focus/visibility and refresh the job every minute. No writes are made.
 
 ## Existing data limitations
 

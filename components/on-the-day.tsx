@@ -3,11 +3,15 @@ import React, { useEffect, useState } from "react";
 import type { DaySchedule } from "@/lib/on-the-day";
 import { deriveOnTheDay } from "@/lib/on-the-day";
 import styles from "./on-the-day.module.css";
-const time = (at: number) => new Intl.DateTimeFormat("en-AU", { hour: "2-digit", minute: "2-digit", hour12: false }).format(at);
+const formatTime = (at: number, timeZone?: string) => new Intl.DateTimeFormat("en-AU", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone }).format(at);
 
 export function OnTheDay({ title, venue, schedule, reviewNow }: { title: string; venue?: string | null; schedule: DaySchedule; reviewNow?: number }) {
   const [liveNow, setNow] = useState<number | null>(null);
   const now = reviewNow ?? liveNow;
+  // Fixed review fixtures must render identically on Netlify (UTC) and clients.
+  // Live jobs render after mount and continue using the device timezone.
+  const timeZone = reviewNow !== undefined ? "Australia/Perth" : undefined;
+  const time = (at: number) => formatTime(at, timeZone);
   useEffect(() => {
     if (reviewNow !== undefined) return;
     const tick = () => setNow(Date.now());
@@ -22,7 +26,7 @@ export function OnTheDay({ title, venue, schedule, reviewNow }: { title: string;
   return <div className={styles.display}>
     <section className={styles.primary} aria-label="Current event state">
       <time className={styles.clock} dateTime={new Date(now).toISOString()}>{time(now)}</time>
-      <p className={styles.local}>{new Intl.DateTimeFormat("en-AU", { weekday: "long", day: "numeric", month: "short", timeZoneName: "short" }).format(now)} · Device local time</p>
+      <p className={styles.local}>{new Intl.DateTimeFormat("en-AU", { weekday: "long", day: "numeric", month: "short", timeZoneName: "short", timeZone }).format(now)} · {reviewNow !== undefined ? "Review time" : "Device local time"}</p>
       <header className={styles.identity}><h1>{title}</h1>{venue ? <p>{venue}</p> : null}</header>
       {context.currentItem ? <div className={styles.current}><p className={styles.label}>Now · {context.currentPhase} · {context.overrun ? "Likely active" : "Expected"}</p><h2>{context.currentItem.title}</h2>
         {context.overrun ? <p className={styles.warning}>Likely running {context.scheduleDriftMinutes} min over</p> : context.remainingMinutes !== undefined ? <p className={styles.remaining}>{context.remainingMinutes} min remaining</p> : <p className={styles.remaining}>{context.elapsedMinutes} min elapsed</p>}

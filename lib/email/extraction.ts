@@ -257,7 +257,7 @@ export function extractProposals(evidence: Evidence): ExtractedProposal[] {
   }
 
   if(!evidence.filename){
-    const directions=cleanText.match(/(?:^|\n)\s*DIRECTIONS:\s*\n?([\s\S]{20,1800}?)(?=\n\s*(?:Margot(?:\s+and\s+John)?\s+Byrne|Regards|Cheers)\b|$)/im);
+    const directions=cleanText.match(/(?:^|\n)\s*DIRECTIONS:\s*\n?([\s\S]{20,1800}?)(?=\n\s*(?:Margot(?:\s+and\s+John)?\s+Byrne|Regards|Cheers)\b|$)/i);
     if(directions){
       results.push(proposal(evidence,"site_note",{key:"access",text:directions[1].trim()},`Access: ${directions[1].trim()}`,0.92,directions[0].trim()));
     }

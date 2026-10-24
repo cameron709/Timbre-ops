@@ -57,3 +57,22 @@ it("does not treat attendee generator rules as production power",()=>{
   expect(proposals.some(item=>item.fieldKey==="pack_item")).toBe(false);
   expect(proposals.some(item=>item.fieldKey==="document")).toBe(true);
 });
+
+
+it("does not mark the same contact as conflicting when a later email adds a phone",()=>{
+  const proposals=markConflicts([
+    ...extractProposals({threadId:"m",messageId:"early",sentAt:"2026-06-24T08:43:46Z",subject:"Muster",body:"Backline confirmed.",from:"Margot Byrne <mt.trio13@gmail.com>",knownContact:true}),
+    ...extractProposals({threadId:"m",messageId:"late",sentAt:"2026-10-12T08:35:30Z",subject:"Muster",body:"Margot 0419 751 801",from:"Margot Byrne <mt.trio13@gmail.com>",knownContact:true})
+  ]).filter(item=>item.fieldKey==="contact");
+  expect(proposals).toHaveLength(2);
+  expect(proposals.every(item=>!item.conflictGroup)).toBe(true);
+});
+
+it("still marks genuinely different primary contact candidates as conflicting",()=>{
+  const proposals=markConflicts([
+    ...extractProposals({threadId:"m",messageId:"a",sentAt:"2026-10-12T08:35:30Z",subject:"Muster",body:"Margot 0419 751 801",from:"Margot Byrne <mt.trio13@gmail.com>",knownContact:true}),
+    ...extractProposals({threadId:"m",messageId:"b",sentAt:"2026-10-12T08:36:30Z",subject:"Muster",body:"Jamie 0400 111 222",from:"Jamie Other <jamie@example.com>",knownContact:true})
+  ]).filter(item=>item.fieldKey==="contact");
+  expect(proposals).toHaveLength(2);
+  expect(proposals.every(item=>item.conflictGroup==="conflict:contact")).toBe(true);
+});

@@ -6,3 +6,10 @@
   NODE_VERSION = "24"
 
 # Netlify automatically installs its current OpenNext adapter for Next.js.
+
+# Synthetic review routes are available only in non-production previews.
+[context.deploy-preview.environment]
+  NEXT_PUBLIC_ENABLE_REVIEW_FIXTURES = "1"
+
+[context.branch-deploy.environment]
+  NEXT_PUBLIC_ENABLE_REVIEW_FIXTURES = "1"

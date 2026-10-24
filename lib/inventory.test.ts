@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { expandPackage, fulfilmentForItem } from "@/lib/inventory";
-import type { GearItem, InventoryPackage, PackageItem } from "@/types/database";
+import { bookingAvailability, expandPackage, fulfilmentForItem, packageWouldCreateCycle } from "@/lib/inventory";
+import type { GearItem, InventoryPackage, Job, PackageItem, PackItem } from "@/types/database";
 
 const now = "2026-10-24T00:00:00Z";
 const item = (id:string,name:string,item_type:GearItem["item_type"]="product"):GearItem => ({
@@ -39,5 +39,41 @@ describe("inventory package expansion",()=>{
     const packages=[pkg("a","A"),pkg("b","B")];
     const packageItems=[component({id:"a-b",package_id:"a",child_package_id:"b"}),component({id:"b-a",package_id:"b",child_package_id:"a"})];
     expect(()=>expandPackage("a",1,packages,packageItems,[])).toThrow(/Package cycle/);
+  });
+});
+
+
+describe("inventory hardening",()=>{
+  it("blocks indirect package cycles before insert",()=>{
+    const packageItems=[
+      component({id:"a-b",package_id:"a",child_package_id:"b"}),
+      component({id:"b-c",package_id:"b",child_package_id:"c"})
+    ];
+    expect(packageWouldCreateCycle("c","a",packageItems)).toBe(true);
+    expect(packageWouldCreateCycle("c","b",packageItems)).toBe(true);
+    expect(packageWouldCreateCycle("a","c",packageItems)).toBe(false);
+  });
+
+  it("checks availability only against overlapping projects",()=>{
+    const top={...item("top","ART 932"),quantity_owned:2};
+    const target={id:"target",title:"Target",status:"confirmed",date_precision:"date",start_date:"2026-11-01",end_date:null,event_date:"2026-11-01",start_at:null,end_at:null} as Job;
+    const overlap={id:"overlap",title:"Overlap",status:"confirmed",date_precision:"date",start_date:"2026-11-01",end_date:null,event_date:"2026-11-01",start_at:null,end_at:null} as Job;
+    const later={id:"later",title:"Later",status:"confirmed",date_precision:"date",start_date:"2026-11-02",end_date:null,event_date:"2026-11-02",start_at:null,end_at:null} as Job;
+    const pack=(job_id:string,quantity_planned:number):PackItem=>({
+      id:`${job_id}-top`,job_id,item_name:"ART 932",quantity_planned,quantity_packed:0,quantity_out:0,quantity_returned:0,state:"planned",
+      notes:null,created_at:now,updated_at:now,source_ref:null,gear_item_id:"top",line_type:"catalogue",source_context:null,
+      booking_id:null,package_id:null,asset_id:null
+    });
+    const drafts=fulfilmentForItem(top,2);
+    const result=bookingAvailability(target,drafts,[top],[pack("overlap",1),pack("later",2)],[target,overlap,later]);
+    expect(result.unknownDate).toBe(false);
+    expect(result.conflicts).toEqual([expect.objectContaining({
+      gearName:"ART 932",quantityOwned:2,existingDemand:1,requested:2,availableBefore:1,shortageAfter:1,conflictingProjects:["Overlap"]
+    })]);
+  });
+
+  it("reports unknown availability when the target project has no date",()=>{
+    const target={id:"target",title:"Target",status:"confirmed",date_precision:"date",start_date:null,end_date:null,event_date:null,start_at:null,end_at:null} as Job;
+    expect(bookingAvailability(target,fulfilmentForItem(item("top","ART 932"),1),[item("top","ART 932")],[],[target])).toEqual({unknownDate:true,conflicts:[]});
   });
 });

@@ -36,7 +36,7 @@ it("extracts Muster navigation, address, reception and specific backline",()=>{
 });
 
 it("extracts one guitar amp and one bass amp from prose",()=>{
-  const proposals=extractProposals({...evidence,body:"The required backline is the drum kit, one guitar amp and one bass amp."}).filter(x=>x.fieldKey==="pack_item");
+  const proposals=extractProposals({threadId:"mt",messageId:"mt2",sentAt:"2026-06-29T05:46:39Z",subject:"Re: Mt Trio Country Music Muster Quote",body:"The required backline is the drum kit, one guitar amp and one bass amp."}).filter(x=>x.fieldKey==="pack_item");
   expect(proposals.some(x=>JSON.stringify(x.value)===JSON.stringify({name:"Guitar amp",quantity:1}))).toBe(true);
   expect(proposals.some(x=>JSON.stringify(x.value)===JSON.stringify({name:"Bass amp",quantity:1}))).toBe(true);
 });

@@ -33,7 +33,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const threads = await Promise.all(threadIds.map((threadId) => gmailFetch<GmailThread>(token, `/threads/${threadId}?format=full`)));
     const normalized = threads.map((thread) => normalizeGmailThread(thread, matchJob)).filter((thread) => thread.match.eligible);
 
-    let proposals = 0;\n    const generatedProposalKeys = new Set<string>();
+    let proposals = 0;
+    const generatedProposalKeys = new Set<string>();
     for (const thread of normalized) {
       const { data: storedThread, error: threadError } = await supabase.from("email_threads").upsert({
         gmail_thread_id: thread.id,
@@ -115,7 +116,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         }
       }
 
-      for (const item of proposalsForNormalizedThread(thread)) {\n        generatedProposalKeys.add(item.idempotencyKey);
+      for (const item of proposalsForNormalizedThread(thread)) {
+        generatedProposalKeys.add(item.idempotencyKey);
         const messageId = messageIds.get(item.sourceMessageId) ?? null;
         const emailAttachmentId = item.sourceAttachmentId ? attachmentIds.get(`${item.sourceMessageId}:${item.sourceAttachmentId}`) ?? null : null;
         const { error: proposalError } = await supabase.from("import_proposals").upsert({
@@ -137,7 +139,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }
     }
 
-    const { data: pending } = await supabase.from("import_proposals").select("id,idempotency_key").eq("job_id", id).eq("status", "pending");\n    const staleIds = (pending ?? []).filter((item) => !generatedProposalKeys.has(item.idempotency_key)).map((item) => item.id);\n    if (staleIds.length) {\n      const { error: cleanupError } = await supabase.from("import_proposals").delete().in("id", staleIds);\n      if (cleanupError) throw cleanupError;\n    }\n\n    const now = new Date().toISOString();
+    const { data: pending } = await supabase.from("import_proposals").select("id,idempotency_key").eq("job_id", id).eq("status", "pending");
+    const staleIds = (pending ?? []).filter((item) => !generatedProposalKeys.has(item.idempotency_key)).map((item) => item.id);
+    if (staleIds.length) {
+      const { error: cleanupError } = await supabase.from("import_proposals").delete().in("id", staleIds);
+      if (cleanupError) throw cleanupError;
+    }
+
+    const now = new Date().toISOString();
     await Promise.all([
       supabase.from("integration_connections").upsert({ provider: "gmail", status: "connected", last_synced_at: now, last_error: null, metadata: { authenticated: true, retrieval: true, sync: true } }),
       supabase.from("sync_runs").insert({ provider: "gmail", status: "succeeded", finished_at: now, records_seen: threads.length, records_changed: normalized.length, metadata: { job_id: id, query, stale_proposals_removed: staleIds.length } })

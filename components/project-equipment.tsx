@@ -39,14 +39,15 @@ export function ProjectEquipment({ jobId, onChanged }: { jobId: string; onChange
   async function addBooking() {
     if (!selection) return;
     const [kind, selectedId] = selection.split(":");
+    const bookingType: JobBooking["booking_type"] = kind === "package" ? "package" : "item";
     const count = Math.max(1, Number(quantity) || 1);
-    const item = kind === "item" ? gear.find((entry) => entry.id === selectedId) : null;
-    const packageRecord = kind === "package" ? packages.find((entry) => entry.id === selectedId) : null;
+    const item = bookingType === "item" ? gear.find((entry) => entry.id === selectedId) : null;
+    const packageRecord = bookingType === "package" ? packages.find((entry) => entry.id === selectedId) : null;
     if (!item && !packageRecord) return;
 
     const inserted = await supabase.from("job_bookings").insert({
       job_id: jobId,
-      booking_type: kind,
+      booking_type: bookingType,
       gear_item_id: item?.id ?? null,
       package_id: packageRecord?.id ?? null,
       quantity: count,

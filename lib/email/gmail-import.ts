@@ -16,4 +16,27 @@ export function normalizeGmailThread(thread:GmailThread,job:MatchJob){const mess
 
 export function proposalsForNormalizedThread(thread:ReturnType<typeof normalizeGmailThread>){const latestTime=thread.latestMessageAt?new Date(thread.latestMessageAt).getTime():null;const cutoff=latestTime===null?null:latestTime-PROPOSAL_HISTORY_DAYS*86400000;const currentMessages=thread.messages.filter(message=>cutoff===null||new Date(message.sentAt).getTime()>=cutoff);const proposals=currentMessages.flatMap(message=>{const base:Evidence={threadId:thread.id,messageId:message.id,sentAt:message.sentAt,subject:message.subject,body:message.body,from:message.from};return[...extractProposals(base),...message.attachments.flatMap(attachment=>extractProposals({...base,body:attachment.extractedText??"",attachmentId:attachment.gmailAttachmentId??undefined,filename:attachment.filename,mimeType:attachment.mimeType??undefined}))];});return markConflicts(proposals);}
 
-export function buildGmailSearch(job:MatchJob){const terms=[`"${job.title.replace(/"/g,"")}"`,...(job.contactEmails??[]).map(email=>`from:${email}`),job.clientName?`"${job.clientName.replace(/"/g,"")}"`:null].filter(Boolean);return `{${terms.join(" ")}} -in:spam -in:trash`;}
+const SEARCH_GENERIC_WORDS=new Set(["event","show","festival","awards","award","music","party","concert","gala","function"]);
+const searchWords=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g," ").split(" ").filter(word=>word.length>2&&!SEARCH_GENERIC_WORDS.has(word));
+const searchDate=(value:Date)=>`${value.getUTCFullYear()}/${String(value.getUTCMonth()+1).padStart(2,"0")}/${String(value.getUTCDate()).padStart(2,"0")}`;
+
+export function buildGmailSearch(job:MatchJob){
+  const title=job.title.replace(/"/g,"").trim();
+  const titleWords=[...new Set(searchWords(title))];
+  const terms=[
+    `"${title}"`,
+    ...titleWords,
+    ...(job.contactEmails??[]).map(email=>`from:${email}`),
+    job.clientName?`"${job.clientName.replace(/"/g,"")}"`:null
+  ].filter(Boolean);
+  let window="";
+  if(job.startDate){
+    const eventDate=new Date(job.startDate);
+    if(Number.isFinite(eventDate.getTime())){
+      const after=new Date(eventDate.getTime()-PROPOSAL_HISTORY_DAYS*86400000);
+      const before=new Date(eventDate.getTime()+90*86400000);
+      window=` after:${searchDate(after)} before:${searchDate(before)}`;
+    }
+  }
+  return `{${terms.join(" ")}}${window} -in:spam -in:trash`;
+}

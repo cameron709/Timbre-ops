@@ -76,3 +76,18 @@ it("still marks genuinely different primary contact candidates as conflicting",(
   expect(proposals).toHaveLength(2);
   expect(proposals.every(item=>item.conflictGroup==="conflict:contact")).toBe(true);
 });
+
+
+it("keeps the mobile network sentence with a reception note",()=>{
+  const proposals=extractProposals({
+    threadId:"mt",
+    messageId:"directions",
+    sentAt:"2026-10-14T06:11:52Z",
+    subject:"AFGRI Mountain Country Music Muster 29 October to 1st November",
+    body:"Reception can get patchy . Only Telstra works out here of course.",
+    from:"Margot Byrne <mt.trio13@gmail.com>",
+    knownContact:true
+  });
+  const reception=proposals.find(item=>item.fieldKey==="site_note"&&(item.value as {key?:string}).key==="reception");
+  expect(reception?.text).toContain("Telstra");
+});

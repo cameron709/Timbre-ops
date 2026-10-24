@@ -274,7 +274,8 @@ export function extractProposals(evidence: Evidence): ExtractedProposal[] {
     }
   }
 
-  if (!["quote", "invoice"].includes(documentType ?? "")) {
+  const productionEvidence=!evidence.filename||["site_plan","stage_plot","run_sheet"].includes(documentType??"");
+  if (productionEvidence && !["quote", "invoice"].includes(documentType ?? "")) {
     const siteRules: Array<[string, RegExp, string]> = [
       ["access", /(?:access|parking|loading|entry)[^.!?]{4,180}[.!?]?/i, "Access"],
       ["power", /(?:power|generator|3 phase|three phase)[^.!?]{4,180}[.!?]?/i, "Power"],

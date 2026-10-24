@@ -40,7 +40,7 @@ export function AssistantBox({ onDone }: { onDone?: () => void }) {
 
   return (
     <form className="assistant-box" onSubmit={submit}>
-      <label htmlFor="assistant-input">What do you need?</label>
+      <label htmlFor="assistant-input">Ask Timbre</label>
       <div className="assistant-input-row">
         <input
           id="assistant-input"

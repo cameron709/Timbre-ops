@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Check, Plus } from "lucide-react";
-import { EmptyState, Pill } from "@/components/ui";
+import { EmptyState, Pill, Sheet } from "@/components/ui";
 import { formatDateOnly, statusLabel } from "@/lib/format";
+import { groupTasks } from "@/lib/task-groups";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { Client, Contact, CrmTask, Job } from "@/types/database";
 
@@ -20,6 +21,7 @@ export default function TasksPage() {
   const [draft, setDraft] = useState<Draft>(blank);
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState("");
+  const [openedAt] = useState(() => new Date());
 
   const load = useCallback(async () => {
     const [taskResult, clientResult, contactResult, jobResult] = await Promise.all([
@@ -65,19 +67,20 @@ export default function TasksPage() {
   const clientById = new Map(clients.map((client) => [client.id, client]));
   const jobById = new Map(jobs.map((job) => [job.id, job]));
 
+  const taskGroups = groupTasks(tasks, openedAt);
+
   return (
-    <main className="page">
+    <main className="page tasks-page">
       <header className="page-head">
         <div>
-          <p className="eyebrow">CRM actions</p>
+          <p className="eyebrow">Follow-ups & commitments</p>
           <h1>Tasks</h1>
           <p>{tasks.filter((task) => task.status !== "Done").length} open follow-ups.</p>
         </div>
         <button className="icon-text-button" onClick={() => setOpen(!open)} type="button"><Plus size={17} /> New</button>
       </header>
-      {open ? (
+      <Sheet open={open} onClose={() => setOpen(false)} title="New task">
         <form className="quick-form" onSubmit={submit}>
-          <h2>New task</h2>
           <label>Title<input required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
           <div className="form-grid two">
             <label>Status<select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as CrmTask["status"] })}><option>To Do</option><option>Waiting</option><option>Done</option></select></label>
@@ -92,22 +95,22 @@ export default function TasksPage() {
           <label>Description<textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></label>
           <div className="review-actions"><button type="submit">Save task</button><button className="secondary-button" type="button" onClick={() => setOpen(false)}>Cancel</button></div>
         </form>
-      ) : null}
+      </Sheet>
       {notice ? <p className="notice">{notice}</p> : null}
-      <section className="ops-list">
-        {!tasks.length ? <EmptyState icon={Check} title="No CRM tasks yet" body="Follow-ups from calls, emails and capture will land here." /> : null}
-        {tasks.map((task) => (
-          <article className="ops-row" key={task.id}>
-            <button className={`complete-button ${task.status === "Done" ? "done" : ""}`} aria-label={`Complete ${task.title}`} onClick={() => complete(task)}><Check size={16} /></button>
-            <div>
-              <div><h2>{task.title}</h2><Pill tone={task.priority === "Urgent" ? "warn" : task.status === "Done" ? "good" : "neutral"}>{task.priority}</Pill></div>
-              <p>{statusLabel(task.status)} · {task.due_date ? formatDateOnly(task.due_date) : "No due date"}</p>
-              {task.client_id ? <Link href={`/clients/${task.client_id}`}>{clientById.get(task.client_id)?.name ?? "Client"}</Link> : null}
+      <div className="task-buckets">
+        {!tasks.length ? <EmptyState icon={Check} title="No tasks yet" body="Follow-ups from calls, emails and capture will land here." /> : null}
+        {taskGroups.map(group => group.items.length ? <section className="task-group" key={group.title}>
+          <header className="task-group-heading"><h2>{group.title}</h2><span>{group.items.length}</span></header>
+          <div className="ops-list">{group.items.map(task => <article className="ops-row" key={task.id}>
+            <button type="button" disabled={task.status === "Done"} className={`complete-button ${task.status === "Done" ? "done" : ""}`} aria-label={task.status === "Done" ? `${task.title} completed` : `Complete ${task.title}`} onClick={() => complete(task)}><Check size={18}/></button>
+            <div><div><h2>{task.title}</h2>{task.priority !== "Normal" ? <Pill tone={task.priority === "Urgent" ? "danger" : "warn"}>{task.priority}</Pill> : task.status === "Waiting" ? <Pill tone="warn">Waiting</Pill> : null}</div>
+              <p>{task.due_date ? formatDateOnly(task.due_date) : "No due date"} · {statusLabel(task.status)}</p>
               {task.job_id ? <Link href={`/jobs/${task.job_id}`}>{jobById.get(task.job_id)?.title ?? "Job"}</Link> : null}
+              {task.client_id ? <Link href={`/clients/${task.client_id}`}>{clientById.get(task.client_id)?.name ?? "Client"}</Link> : null}
             </div>
-          </article>
-        ))}
-      </section>
+          </article>)}</div>
+        </section> : null)}
+      </div>
     </main>
   );
 }

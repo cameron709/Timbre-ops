@@ -18,6 +18,8 @@ export function AuthGate({ children }: AuthGateProps) {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [recovering, setRecovering] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
   const configured = hasSupabaseConfig();
 
   useEffect(() => {
@@ -34,8 +36,9 @@ export function AuthGate({ children }: AuthGateProps) {
       setLoading(false);
     });
 
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
+      if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
       setLoading(false);
     });
 
@@ -77,6 +80,49 @@ export function AuthGate({ children }: AuthGateProps) {
 
   if (loading) {
     return <main className="center-screen">Loading Timbre Ops...</main>;
+  }
+
+  async function updateRecoveredPassword(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage(null);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    setPasswordRecovery(false);
+    setNewPassword("");
+    setMessage("Password updated.");
+  }
+
+  if (passwordRecovery && session) {
+    return (
+      <main className="auth-screen">
+        <section className="auth-panel" aria-label="Set new password">
+          <BrandMark className="auth-brand" />
+          <h1>Set a new password</h1>
+          <p>Choose the password you will use for normal Timbre Ops sign-in.</p>
+          <form onSubmit={updateRecoveredPassword} className="auth-form">
+            <label>
+              New password
+              <span>
+                <KeyRound size={16} />
+                <input
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                />
+              </span>
+            </label>
+            <button type="submit">Save password</button>
+          </form>
+          {message ? <p className="form-message">{message}</p> : null}
+        </section>
+      </main>
+    );
   }
 
   if (!session) {

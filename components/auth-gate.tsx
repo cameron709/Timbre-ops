@@ -17,7 +17,7 @@ export function AuthGate({ children }: AuthGateProps) {
   const [email, setEmail] = useState("cameron@timbrepa.com.au");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-  const [mode, setMode] = useState<"password" | "link">("password");
+  const [recovering, setRecovering] = useState(false);
   const configured = hasSupabaseConfig();
 
   useEffect(() => {
@@ -61,17 +61,18 @@ export function AuthGate({ children }: AuthGateProps) {
     event.preventDefault();
     setMessage(null);
 
-    if (mode === "link") {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` }
-      });
-      setMessage(error ? error.message : "Check your email for the sign-in link.");
-      return;
-    }
-
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setMessage(error ? error.message : null);
+  }
+
+  async function recoverPassword() {
+    setRecovering(true);
+    setMessage(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin
+    });
+    setRecovering(false);
+    setMessage(error ? error.message : "Password reset email sent. You only need this if you have forgotten your password.");
   }
 
   if (loading) {
@@ -84,7 +85,7 @@ export function AuthGate({ children }: AuthGateProps) {
         <section className="auth-panel" aria-label="Sign in">
           <BrandMark className="auth-brand" />
           <h1>Operations</h1>
-          <p>Sign in with Supabase Auth to access live operations data.</p>
+          <p>Sign in with your Timbre Ops email and password.</p>
           <form onSubmit={signIn} className="auth-form">
             <label>
               Email
@@ -93,24 +94,23 @@ export function AuthGate({ children }: AuthGateProps) {
                 <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required />
               </span>
             </label>
-            {mode === "password" ? (
-              <label>
-                Password
-                <span>
-                  <KeyRound size={16} />
-                  <input
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    type="password"
-                    autoComplete="current-password"
-                  />
-                </span>
-              </label>
-            ) : null}
-            <button type="submit">{mode === "password" ? "Sign in" : "Send sign-in link"}</button>
+            <label>
+              Password
+              <span>
+                <KeyRound size={16} />
+                <input
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                />
+              </span>
+            </label>
+            <button type="submit">Sign in</button>
           </form>
-          <button className="text-button" type="button" onClick={() => setMode(mode === "password" ? "link" : "password")}>
-            {mode === "password" ? "Use email link instead" : "Use password instead"}
+          <button className="text-button" type="button" onClick={recoverPassword} disabled={recovering || !email}>
+            {recovering ? "Sending reset email..." : "Forgot password?"}
           </button>
           {message ? <p className="form-message">{message}</p> : null}
         </section>
